@@ -15,7 +15,6 @@ describe("RankedChoiceVoting", function () {
         return { rankedChoiceContract, owner, user1, user2, user3 }
     }
 
-    //check that a new candidate is successdully createdand
     describe("Create candidate", function () {
         it("...emits an event after creating a candidate", async function () {
             const { rankedChoiceContract, owner } = await loadFixture(
@@ -39,6 +38,22 @@ describe("RankedChoiceVoting", function () {
             assert(
                 candidate.walletAddress.toString() == owner.address.toString()
             )
+        })
+
+        it("...reverts if a candidate of the same address already exists", async function () {
+            const { rankedChoiceContract, owner } = await loadFixture(
+                deployRankedChoiceVotingContract
+            )
+
+            //enter a candidate
+            await rankedChoiceContract.enterCandidate("Candidate1")
+
+            await expect(rankedChoiceContract.enterCandidate("Test 1"))
+                .to.be.revertedWithCustomError(
+                    rankedChoiceContract,
+                    "Voting_CandidateAlreadyExists"
+                )
+                .withArgs(owner.address)
         })
     })
 })

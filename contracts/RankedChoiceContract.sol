@@ -60,6 +60,9 @@ contract RankedChoiceContract {
     ) external {
         // checks:
         //if candidate already exists
+        if (checkIfCandidateExist(msg.sender)) {
+            revert Voting_CandidateAlreadyExists(msg.sender);
+        }
 
         //assign candidate id number
         candidateIdCounter.increment();
@@ -79,16 +82,6 @@ contract RankedChoiceContract {
             false,
             0
         );
-
-        // candidate.id = _candidateId;
-        // candidate.name = _candidateName;
-        // candidate.walletAddress = _candidateAddress;
-        // candidate.firstVotesCount = _firstVotesCount;
-        // candidate.secondVotesCount = _secondVotesCount;
-        // candidate.thirdVotesCount = _thirdVotesCount;
-        // candidate.isEliminated = false;
-        // candidate.isWinner = false;
-        // candidate.totalVotesCount = 0;
 
         //store candidate struct in mapping
         addressToCandidate[msg.sender] = candidate;
@@ -114,5 +107,13 @@ contract RankedChoiceContract {
             revert Voting_CandidateAddressDoesNotExist(_candidateAddress);
         }
         return addressToCandidate[_candidateAddress];
+    }
+
+    function checkIfCandidateExist(address _candidateAddress)
+        public
+        view
+        returns (bool)
+    {
+        return (addressToCandidate[_candidateAddress].id > 0) ? true : false;
     }
 }
