@@ -26,6 +26,19 @@ describe("RankedChoiceVoting", function () {
                 "CandidateCreated"
             )
         })
+
+        it("...creates a candidate after calling enterCandidate function", async function () {
+            const { rankedChoiceContract, owner } = await loadFixture(
+                deployRankedChoiceVotingContract
+            )
+
+            await rankedChoiceContract.enterCandidate("Test 1")
+            const candidate = await rankedChoiceContract.getCandidateByAddress(
+                owner.address
+            )
+            assert(
+                candidate.walletAddress.toString() == owner.address.toString()
+            )
+        })
     })
-    //check that an event is emitted after candidate is created
 })
