@@ -22,6 +22,12 @@ contract RankedChoiceContract {
         address indexed walletAddress
     );
 
+    event CandidateWithdrawn(
+        uint256 indexed id,
+        string indexed name,
+        address indexed walletAddress
+    );
+
     /// Candidate variables ///
     struct Candidate {
         uint256 id;
@@ -42,9 +48,9 @@ contract RankedChoiceContract {
     /// Voter variables ///
 
     /// Election global variables ///
-    uint256 numberOfCandidates;
     bool isWinnerPicked;
     Counters.Counter private candidateIdCounter;
+    Counters.Counter private numberOfCandidates;
 
     //mapping candidate address to struct
 
@@ -53,19 +59,22 @@ contract RankedChoiceContract {
 
     /** Functions */
 
-    //Function to register
+    /**
+     * @notice this functions registers candidates
+     * @param _candidateName The name of the candidate
+     * @dev will be disabled when register phase is over
+     */
     function enterCandidate(
         // address _candidateAddress,
         string memory _candidateName // uint256 _firstVotesCount, // uint256 _secondVotesCount, // uint256 _thirdVotesCount
     ) external {
-        // checks:
-        //if candidate already exists
         if (checkIfCandidateExist(msg.sender)) {
             revert Voting_CandidateAlreadyExists(msg.sender);
         }
 
         //assign candidate id number
         candidateIdCounter.increment();
+        numberOfCandidates.increment();
         uint256 _candidateId = candidateIdCounter.current();
 
         //create candidate struct
@@ -97,7 +106,30 @@ contract RankedChoiceContract {
         );
     }
 
-    /// Getter functions ///abi
+    /**
+     * @notice withdraws from election
+     * @dev checks:
+     *      1 . disabled when register phase is over
+     *      2. check that person who registered are only the one who can withdraw
+     *      3. check that cannot withdraw if entry does not exist
+     */
+    function withdrawCandidate() external {
+        if (addressToCandidate[msg.sender].id <= 0) {
+            revert Voting_CandidateAddressDoesNotExist(msg.sender);
+        }
+
+        Candidate memory _candidate = addressToCandidate[msg.sender];
+
+        delete (addressToCandidate[msg.sender]);
+        numberOfCandidates.decrement();
+        emit CandidateWithdrawn(
+            _candidate.id,
+            _candidate.name,
+            _candidate.walletAddress
+        );
+    }
+
+    /// Getter functions ///
     function getCandidateByAddress(address _candidateAddress)
         external
         view
@@ -115,5 +147,9 @@ contract RankedChoiceContract {
         returns (bool)
     {
         return (addressToCandidate[_candidateAddress].id > 0) ? true : false;
+    }
+
+    function getNumberOfCandidates() public view returns (uint256) {
+        return numberOfCandidates.current();
     }
 }

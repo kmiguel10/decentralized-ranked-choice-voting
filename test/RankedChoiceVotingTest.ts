@@ -15,6 +15,19 @@ describe("RankedChoiceVoting", function () {
         return { rankedChoiceContract, owner, user1, user2, user3 }
     }
 
+    //fixture for withdraw tests
+    async function withdrawFixture() {
+        const [owner, user1, user2, user3] = await ethers.getSigners()
+        const RankedChoiceContract = await ethers.getContractFactory(
+            "RankedChoiceContract"
+        )
+        const rankedChoiceContract = await RankedChoiceContract.deploy()
+        await rankedChoiceContract.deployed()
+        await rankedChoiceContract.enterCandidate("Candidate 1")
+
+        return { rankedChoiceContract, owner, user1, user2 }
+    }
+
     describe("Create candidate", function () {
         it("...emits an event after creating a candidate", async function () {
             const { rankedChoiceContract, owner } = await loadFixture(
@@ -24,6 +37,17 @@ describe("RankedChoiceVoting", function () {
                 rankedChoiceContract,
                 "CandidateCreated"
             )
+        })
+
+        it("...creates 3 candidates and returns candidate count which is 3", async function () {
+            const { rankedChoiceContract, owner, user1, user2 } =
+                await loadFixture(deployRankedChoiceVotingContract)
+            await rankedChoiceContract.enterCandidate("Test 1")
+            await rankedChoiceContract.connect(user1).enterCandidate("Test 2")
+            await rankedChoiceContract.connect(user2).enterCandidate("Test 3")
+            const _numberOfCandidates =
+                await rankedChoiceContract.getNumberOfCandidates()
+            assert.equal(3, _numberOfCandidates)
         })
 
         it("...creates a candidate after calling enterCandidate function", async function () {
@@ -54,6 +78,70 @@ describe("RankedChoiceVoting", function () {
                     "Voting_CandidateAlreadyExists"
                 )
                 .withArgs(owner.address)
+        })
+    })
+
+    //withdraw candidate
+    //withdraw and check for event
+    //withdraw and attempt to withdraw again and revert with error candidate does not exist
+    //withdraw and check the number of candidates
+    //withdraw and enter and withdraw and check again
+    describe("Withdraw candidate", function () {
+        it("...emits an events after withdrawing candidate", async function () {
+            const { rankedChoiceContract, owner } = await loadFixture(
+                withdrawFixture
+            )
+
+            expect(await rankedChoiceContract.withdrawCandidate()).to.emit(
+                rankedChoiceContract,
+                "CandidateWithdrawn"
+            )
+        })
+
+        it("...it reverts if the user attempts to withdraw a nonexistent candidate", async function () {
+            const { rankedChoiceContract, owner } = await loadFixture(
+                withdrawFixture
+            )
+
+            await rankedChoiceContract.withdrawCandidate()
+
+            await expect(rankedChoiceContract.withdrawCandidate())
+                .to.be.revertedWithCustomError(
+                    rankedChoiceContract,
+                    "Voting_CandidateAddressDoesNotExist"
+                )
+                .withArgs(owner.address)
+        })
+
+        it("...returns the number of candidate after withdrawing", async function () {
+            const { rankedChoiceContract, owner, user1, user2 } =
+                await loadFixture(withdrawFixture)
+
+            await rankedChoiceContract
+                .connect(user1)
+                .enterCandidate("Candidate 2")
+            await rankedChoiceContract
+                .connect(user2)
+                .enterCandidate("Candidate 3")
+            await rankedChoiceContract.withdrawCandidate()
+
+            const _numOfCandidates =
+                await rankedChoiceContract.getNumberOfCandidates()
+
+            assert.equal(2, _numOfCandidates)
+        })
+
+        it("...registers a candidate again after registering a candidate and withdrawing", async function () {
+            const { rankedChoiceContract, owner, user1, user2 } =
+                await loadFixture(withdrawFixture)
+
+            await rankedChoiceContract.withdrawCandidate()
+            await rankedChoiceContract.enterCandidate("Candidate 2")
+
+            const _numOfCandidates =
+                await rankedChoiceContract.getNumberOfCandidates()
+
+            assert.equal(1, _numOfCandidates)
         })
     })
 })
