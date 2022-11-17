@@ -39,6 +39,29 @@ describe("RankedChoiceVoting", function () {
             )
         })
 
+        it("...emits a VoterRegistered event after creating a candidate", async function () {
+            const { rankedChoiceContract } = await loadFixture(
+                deployRankedChoiceVotingContract
+            )
+            expect(await rankedChoiceContract.enterCandidate("Test 1")).to.emit(
+                rankedChoiceContract,
+                "VoterRegistered"
+            )
+        })
+
+        it("...reverts when attempting to register as a voter after entering as a candidate", async function () {
+            const { rankedChoiceContract, owner } = await loadFixture(
+                deployRankedChoiceVotingContract
+            )
+            await rankedChoiceContract.enterCandidate("Test 1")
+            await expect(rankedChoiceContract.registerToVote())
+                .to.be.revertedWithCustomError(
+                    rankedChoiceContract,
+                    "Voting_VoterIsAlreadyRegistered"
+                )
+                .withArgs(owner.address)
+        })
+
         it("...creates 3 candidates and returns candidate count which is 3", async function () {
             const { rankedChoiceContract, owner, user1, user2 } =
                 await loadFixture(deployRankedChoiceVotingContract)

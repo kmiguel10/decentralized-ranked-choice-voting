@@ -29,10 +29,7 @@ contract RankedChoiceContract {
         address indexed walletAddress
     );
 
-    event VoterRegistered(
-        uint256 indexed id,
-        address indexed walletAddress
-    )
+    event VoterRegistered(uint256 indexed id, address indexed walletAddress);
 
     /// Candidate variables ///
     struct Candidate {
@@ -57,6 +54,7 @@ contract RankedChoiceContract {
         uint256 thirdVote;
         bool hasVoted;
         bool isRegistered;
+        bool isCandidate;
     }
 
     address[] private candidateAddresses; //array of candidates
@@ -82,18 +80,32 @@ contract RankedChoiceContract {
 
     /**
      * @notice this function register voters to vote for phase 2: Voting
-     * @dev users who enter as a candidate will be registered automatically, will be disabled at the end of phase 1
+     * @dev
+     * 1. users who enter as a candidate will be registered automatically, will be disabled at the end of phase 1
+     * 2. Optimize this by accessing struct once and store it in a local variable and use that for the checks.. see coverage first and gas viewer
+     *
      */
     function registerToVote() public {
-        //check for cannot register twice - AlreadyRegisteredToVote
-        if(checkIfVoterExist(msg.sender)) {
-            revert Voting_VoterIsAlreadyRegistered(msg.sender)
+        //check for non-candidate voters
+        if (
+            checkIfVoterExist(msg.sender) &&
+            registeredVoters[msg.sender].isCandidate == false
+        ) {
+            revert Voting_VoterIsAlreadyRegistered(msg.sender);
+        }
+
+        //check for candidates
+        if (
+            checkIfVoterExist(msg.sender) &&
+            registeredVoters[msg.sender].isCandidate == true
+        ) {
+            revert Voting_VoterIsAlreadyRegistered(msg.sender);
         }
 
         voterIdCounter.increment();
         numberOfVoters.increment();
 
-        uint256 _voterId = voterIdCounter.current()
+        uint256 _voterId = voterIdCounter.current();
 
         Voter memory voter = Voter(
             _voterId,
@@ -102,13 +114,14 @@ contract RankedChoiceContract {
             0,
             0,
             false,
-            true
-        )
+            true,
+            false
+        );
 
         registeredVoters[msg.sender] = voter;
 
         //emit event
-    emit VoterRegistered(_voterId, msg.sender)
+        emit VoterRegistered(_voterId, msg.sender);
     }
 
     /**
@@ -159,8 +172,11 @@ contract RankedChoiceContract {
             candidate.name,
             candidate.walletAddress
         );
-
-        registerToVote()
+        //if entering again after withdrawing then doesnt need to register again
+        if (registeredVoters[msg.sender].voterId <= 0) {
+            registerToVote();
+            registeredVoters[msg.sender].isCandidate = true;
+        }
     }
 
     /**
@@ -206,12 +222,15 @@ contract RankedChoiceContract {
         return (addressToCandidate[_candidateAddress].id > 0) ? true : false;
     }
 
-    function checkIfVoterExist(address _voterAddress) public view returns (bool) {
+    function checkIfVoterExist(address _voterAddress)
+        public
+        view
+        returns (bool)
+    {
         return (registeredVoters[_voterAddress].voterId > 0) ? true : false;
     }
 
     function getNumberOfCandidates() public view returns (uint256) {
         return numberOfCandidates.current();
     }
-
 }
