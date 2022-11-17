@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 /// Errors ///
 error Voting_CandidateAlreadyExists(address candidateAddress);
 error Voting_CandidateAddressDoesNotExist(address candidateAddress);
+error Voting_VoterIsAlreadyRegistered(address voterAddress);
 
 /**
  * @title A Ranked Choice Voting Smart Contract
@@ -28,6 +29,11 @@ contract RankedChoiceContract {
         address indexed walletAddress
     );
 
+    event VoterRegistered(
+        uint256 indexed id,
+        address indexed walletAddress
+    )
+
     /// Candidate variables ///
     struct Candidate {
         uint256 id;
@@ -41,9 +47,22 @@ contract RankedChoiceContract {
         uint256 totalVotesCount;
     }
 
+    ///should I create a voter struct???
+    struct Voter {
+        uint256 voterId;
+        // string name;
+        address walletAddress;
+        uint256 firstVote;
+        uint256 secondVote;
+        uint256 thirdVote;
+        bool hasVoted;
+        bool isRegistered;
+    }
+
     address[] private candidateAddresses; //array of candidates
     //mapping(uint256 => mapping(address => Candidate)) private addressToCandidate;
     mapping(address => Candidate) private addressToCandidate;
+    mapping(address => Voter) private registeredVoters;
 
     /// Voter variables ///
 
@@ -51,6 +70,8 @@ contract RankedChoiceContract {
     bool isWinnerPicked;
     Counters.Counter private candidateIdCounter;
     Counters.Counter private numberOfCandidates;
+    Counters.Counter private voterIdCounter;
+    Counters.Counter private numberOfVoters;
 
     //mapping candidate address to struct
 
@@ -60,9 +81,40 @@ contract RankedChoiceContract {
     /** Functions */
 
     /**
+     * @notice this function register voters to vote for phase 2: Voting
+     * @dev users who enter as a candidate will be registered automatically, will be disabled at the end of phase 1
+     */
+    function registerToVote() public {
+        //check for cannot register twice - AlreadyRegisteredToVote
+        if(checkIfVoterExist(msg.sender)) {
+            revert Voting_VoterIsAlreadyRegistered(msg.sender)
+        }
+
+        voterIdCounter.increment();
+        numberOfVoters.increment();
+
+        uint256 _voterId = voterIdCounter.current()
+
+        Voter memory voter = Voter(
+            _voterId,
+            msg.sender,
+            0,
+            0,
+            0,
+            false,
+            true
+        )
+
+        registeredVoters[msg.sender] = voter;
+
+        //emit event
+    emit VoterRegistered(_voterId, msg.sender)
+    }
+
+    /**
      * @notice this functions registers candidates
      * @param _candidateName The name of the candidate
-     * @dev will be disabled when register phase is over
+     * @dev will be registered to vote automatically and will be disabled when register phase is over
      */
     function enterCandidate(
         // address _candidateAddress,
@@ -95,7 +147,10 @@ contract RankedChoiceContract {
         //store candidate struct in mapping
         addressToCandidate[msg.sender] = candidate;
 
-        //push to candidate address
+        //store user address to registeredVoter mapping
+        //emit event
+
+        //push to candidate address - might not be necessary
         candidateAddresses.push(msg.sender);
 
         //emit CandidateRegistered event
@@ -104,6 +159,8 @@ contract RankedChoiceContract {
             candidate.name,
             candidate.walletAddress
         );
+
+        registerToVote()
     }
 
     /**
@@ -149,7 +206,12 @@ contract RankedChoiceContract {
         return (addressToCandidate[_candidateAddress].id > 0) ? true : false;
     }
 
+    function checkIfVoterExist(address _voterAddress) public view returns (bool) {
+        return (registeredVoters[_voterAddress].voterId > 0) ? true : false;
+    }
+
     function getNumberOfCandidates() public view returns (uint256) {
         return numberOfCandidates.current();
     }
+
 }
