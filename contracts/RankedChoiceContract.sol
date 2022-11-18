@@ -7,6 +7,9 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 error Voting_CandidateAlreadyExists(address candidateAddress);
 error Voting_CandidateAddressDoesNotExist(address candidateAddress);
 error Voting_VoterIsAlreadyRegistered(address voterAddress);
+error PhaseTwo_RegisteringPhaseIsOver(address voterAddress);
+error PhaseTwo_EnteringCandidatePhaseIsOver(address voterAddress);
+error PhaseTwo_CannotWithdrawPhaseOneIsOver(address voterAddress);
 
 /**
  * @title A Ranked Choice Voting Smart Contract
@@ -65,11 +68,17 @@ contract RankedChoiceContract {
     /// Voter variables ///
 
     /// Election global variables ///
+    bool phaseOneSwitch;
+    bool phaseTwoSwitch;
+    bool phaseThreeSwitch;
     bool isWinnerPicked;
     Counters.Counter private candidateIdCounter;
     Counters.Counter private numberOfCandidates;
     Counters.Counter private voterIdCounter;
     Counters.Counter private numberOfVoters;
+    uint256 constant FIRST_CHOICE = 3;
+    uint256 constant SECOND_CHOICE = 2;
+    uint256 constant THIRD_CHOICE = 1;
 
     //mapping candidate address to struct
 
@@ -200,6 +209,50 @@ contract RankedChoiceContract {
             _candidate.name,
             _candidate.walletAddress
         );
+    }
+
+    /// Phase 2 Functions ///
+
+    /**
+     * @notice this function turns on the phase 2 (voting) switch which disables phase 1 functionalities
+     * @dev look for checks
+     */
+    function beginPhaseTwo() private {
+        phaseOneSwitch = false;
+        phaseTwoSwitch = true;
+    }
+
+    /**
+     * @notice this function allows voters to vote their choices in the election
+     * @dev come back to implement checks:
+     * 1. phase switches
+     * 2. flags: isRegistered, hasVoted
+     * 3. Update points for candidate structs
+     */
+    function vote(
+        address firstChoice,
+        address secondChoice,
+        address thirdChoice
+    ) public {
+        //checks
+        //updates
+        //look for first choice and add score - can definitely improve this...
+        //we are accessing storage multiple times...
+        Candidate memory _firstChoice = addressToCandidate[firstChoice];
+        _firstChoice.firstVotesCount =
+            _firstChoice.firstVotesCount +
+            FIRST_CHOICE;
+
+        Candidate memory _secondChoice = addressToCandidate[secondChoice];
+        _secondChoice.secondVotesCount =
+            _secondChoice.secondVotesCount +
+            SECOND_CHOICE;
+
+        Candidate memory _thirdChoice = addressToCandidate[thirdChoice];
+        _thirdChoice.thirdVotesCount =
+            _thirdChoice.thirdVotesCount +
+            THIRD_CHOICE;
+        //emit event
     }
 
     /// Getter functions ///
