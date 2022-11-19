@@ -28,6 +28,26 @@ describe("RankedChoiceVoting", function () {
         return { rankedChoiceContract, owner, user1, user2 }
     }
 
+    //fixture for voting() tests
+    async function votingFixture() {
+        //need to vote
+        const [owner, user1, user2, user3] = await ethers.getSigners()
+        const RankedChoiceContract = await ethers.getContractFactory(
+            "RankedChoiceContract"
+        )
+        const rankedChoiceContract = await RankedChoiceContract.deploy()
+        await rankedChoiceContract.deployed()
+        //enter candidates
+        await rankedChoiceContract.enterCandidate("Candidate 1")
+        await rankedChoiceContract.connect(user1).enterCandidate("Candidate 2")
+        await rankedChoiceContract.connect(user2).enterCandidate("Candidate 3")
+
+        //connect back to the main user
+        await rankedChoiceContract.connect(owner)
+
+        return { rankedChoiceContract, owner, user1, user2, user3 }
+    }
+
     describe("Create candidate", function () {
         it("...emits an event after creating a candidate", async function () {
             const { rankedChoiceContract, owner } = await loadFixture(
@@ -104,11 +124,6 @@ describe("RankedChoiceVoting", function () {
         })
     })
 
-    //withdraw candidate
-    //withdraw and check for event
-    //withdraw and attempt to withdraw again and revert with error candidate does not exist
-    //withdraw and check the number of candidates
-    //withdraw and enter and withdraw and check again
     describe("Withdraw candidate", function () {
         it("...emits an events after withdrawing candidate", async function () {
             const { rankedChoiceContract, owner } = await loadFixture(
@@ -165,6 +180,137 @@ describe("RankedChoiceVoting", function () {
                 await rankedChoiceContract.getNumberOfCandidates()
 
             assert.equal(1, _numOfCandidates)
+        })
+    })
+
+    //check for event - done
+    //check for updates points for the candidates
+    //check for errors
+    // - vote again and check for revert
+    // - vote for the same candidates and must be an error
+    // - try voting for a candidate that doesnt exist
+    describe("Vote for candidates", function () {
+        it("...emits an event after voting for candidates", async function () {
+            const { rankedChoiceContract, owner, user1, user2, user3 } =
+                await loadFixture(votingFixture)
+
+            expect(
+                await rankedChoiceContract.vote(
+                    owner.address,
+                    user1.address,
+                    user2.address
+                )
+            ).to.emit(rankedChoiceContract, "Voted")
+        })
+
+        //should i split this into 3 test?
+        // it("...checks that the candidates (1, 2, 3) have updated vote counts", async function () {
+        //     const { rankedChoiceContract, owner, user1, user2, user3 } =
+        //         await loadFixture(votingFixture)
+        //     await rankedChoiceContract.vote(
+        //         owner.address,
+        //         user1.address,
+        //         user2.address
+        //     )
+
+        //     const _candidate1 =
+        //         await rankedChoiceContract.getCandidateByAddress(owner.address)
+        //     const _candidate2 =
+        //         await rankedChoiceContract.getCandidateByAddress(user1.address)
+        //     const _candidate3 =
+        //         await rankedChoiceContract.getCandidateByAddress(user2.address)
+
+        //     assert.equal(_candidate1.firstVotesCount, 3)
+        //     assert.equal(_candidate2.secondVotesCount, 2)
+        //     assert.equal(_candidate3.thirdVotesCount, 1)
+        // })
+        it("...checks that after voting, candidate 1 has 3 points", async function () {
+            const { rankedChoiceContract, owner, user1, user2, user3 } =
+                await loadFixture(votingFixture)
+            await rankedChoiceContract.vote(
+                owner.address,
+                user1.address,
+                user2.address
+            )
+
+            const _candidate1 =
+                await rankedChoiceContract.getCandidateByAddress(owner.address)
+
+            assert.equal(_candidate1.firstVotesCount, 3)
+        })
+        it("...checks that after voting, candidate 2 has 2 points", async function () {
+            const { rankedChoiceContract, owner, user1, user2, user3 } =
+                await loadFixture(votingFixture)
+            await rankedChoiceContract.vote(
+                owner.address,
+                user1.address,
+                user2.address
+            )
+            const _candidate2 =
+                await rankedChoiceContract.getCandidateByAddress(user1.address)
+
+            assert.equal(_candidate2.secondVotesCount, 2)
+        })
+        it("...checks that after voting, candidate 3 has 1 point", async function () {
+            const { rankedChoiceContract, owner, user1, user2, user3 } =
+                await loadFixture(votingFixture)
+            await rankedChoiceContract.vote(
+                owner.address,
+                user1.address,
+                user2.address
+            )
+            const _candidate3 =
+                await rankedChoiceContract.getCandidateByAddress(user2.address)
+            assert.equal(_candidate3.thirdVotesCount, 1)
+        })
+
+        it("...checks that after voting from two different voters, candidate 1 has 6 points", async function () {
+            const { rankedChoiceContract, owner, user1, user2 } =
+                await loadFixture(votingFixture)
+            await rankedChoiceContract.vote(
+                owner.address,
+                user1.address,
+                user2.address
+            )
+            await rankedChoiceContract
+                .connect(user1)
+                .vote(owner.address, user1.address, user2.address)
+
+            const _candidate1 =
+                await rankedChoiceContract.getCandidateByAddress(owner.address)
+
+            assert.equal(_candidate1.firstVotesCount, 6)
+        })
+        it("...checks that after voting from two different voters, candidate 2 has 4 points", async function () {
+            const { rankedChoiceContract, owner, user1, user2 } =
+                await loadFixture(votingFixture)
+            await rankedChoiceContract.vote(
+                owner.address,
+                user1.address,
+                user2.address
+            )
+            await rankedChoiceContract
+                .connect(user1)
+                .vote(owner.address, user1.address, user2.address)
+            const _candidate2 =
+                await rankedChoiceContract.getCandidateByAddress(user1.address)
+
+            assert.equal(_candidate2.secondVotesCount, 4)
+        })
+        it("...checks that after voting from two different voters, candidate 3 has 2 point", async function () {
+            const { rankedChoiceContract, owner, user1, user2 } =
+                await loadFixture(votingFixture)
+            await rankedChoiceContract.vote(
+                owner.address,
+                user1.address,
+                user2.address
+            )
+            await rankedChoiceContract
+                .connect(user1)
+                .vote(owner.address, user1.address, user2.address)
+            const _candidate3 =
+                await rankedChoiceContract.getCandidateByAddress(user2.address)
+            assert.equal(_candidate3.thirdVotesCount, 2)
         })
     })
 })
