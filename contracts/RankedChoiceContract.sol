@@ -7,9 +7,12 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 error Voting_CandidateAlreadyExists(address candidateAddress);
 error Voting_CandidateAddressDoesNotExist(address candidateAddress);
 error Voting_VoterIsAlreadyRegistered(address voterAddress);
+error Voting_VoterDoesNotExist(address voterAddress);
 error PhaseTwo_RegisteringPhaseIsOver(address voterAddress);
 error PhaseTwo_EnteringCandidatePhaseIsOver(address voterAddress);
 error PhaseTwo_CannotWithdrawPhaseOneIsOver(address voterAddress);
+error Voting_AlreadyVoted(address voterAddress);
+error Voting_VoterIsNotRegistered(address voterAddress);
 
 /**
  * @title A Ranked Choice Voting Smart Contract
@@ -33,6 +36,14 @@ contract RankedChoiceContract {
     );
 
     event VoterRegistered(uint256 indexed id, address indexed walletAddress);
+
+    event Voted(
+        uint256 indexed id,
+        address indexed voterAddress,
+        address firstChoice,
+        address secondChoice,
+        address thirdChoice
+    );
 
     /// Candidate variables ///
     struct Candidate {
@@ -235,6 +246,22 @@ contract RankedChoiceContract {
         address thirdChoice
     ) public {
         //checks
+        if (checkIfVoterExist(msg.sender) == false) {
+            revert Voting_VoterDoesNotExist(msg.sender);
+        }
+
+        Voter memory _voter = registeredVoters[msg.sender];
+
+        if (_voter.isRegistered == false) {
+            revert Voting_VoterIsNotRegistered(msg.sender);
+        }
+
+        if (_voter.hasVoted == true) {
+            revert Voting_AlreadyVoted(msg.sender);
+        }
+
+        //need a check for picking same candidate multiple times... cannot happen
+
         //updates
         //look for first choice and add score - can definitely improve this...
         //we are accessing storage multiple times...
@@ -243,16 +270,35 @@ contract RankedChoiceContract {
             _firstChoice.firstVotesCount +
             FIRST_CHOICE;
 
+        addressToCandidate[firstChoice] = _firstChoice;
+
         Candidate memory _secondChoice = addressToCandidate[secondChoice];
         _secondChoice.secondVotesCount =
             _secondChoice.secondVotesCount +
             SECOND_CHOICE;
 
+        addressToCandidate[secondChoice] = _secondChoice;
+
         Candidate memory _thirdChoice = addressToCandidate[thirdChoice];
         _thirdChoice.thirdVotesCount =
             _thirdChoice.thirdVotesCount +
             THIRD_CHOICE;
+
+        addressToCandidate[thirdChoice] = _thirdChoice;
+
+        //change flags
+        _voter.hasVoted = true;
+
+        registeredVoters[msg.sender] = _voter;
+
         //emit event
+        emit Voted(
+            _voter.voterId,
+            _voter.walletAddress,
+            firstChoice,
+            secondChoice,
+            thirdChoice
+        );
     }
 
     /// Getter functions ///
@@ -265,6 +311,17 @@ contract RankedChoiceContract {
             revert Voting_CandidateAddressDoesNotExist(_candidateAddress);
         }
         return addressToCandidate[_candidateAddress];
+    }
+
+    function getVoterByAddress(address _voterAddress)
+        external
+        view
+        returns (Voter memory)
+    {
+        if (registeredVoters[_voterAddress].voterId <= 0) {
+            revert Voting_VoterDoesNotExist(_voterAddress);
+        }
+        return registeredVoters[_voterAddress];
     }
 
     function checkIfCandidateExist(address _candidateAddress)
