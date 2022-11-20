@@ -184,7 +184,8 @@ describe("RankedChoiceVoting", function () {
     })
 
     //check for event - done
-    //check for updates points for the candidates
+    //check for updates points for the candidates - done
+    //check that previously voter voter is marked has 'hasVoted' - done
     //check for errors
     // - vote again and check for revert
     // - vote for the same candidates and must be an error
@@ -203,27 +204,6 @@ describe("RankedChoiceVoting", function () {
             ).to.emit(rankedChoiceContract, "Voted")
         })
 
-        //should i split this into 3 test?
-        // it("...checks that the candidates (1, 2, 3) have updated vote counts", async function () {
-        //     const { rankedChoiceContract, owner, user1, user2, user3 } =
-        //         await loadFixture(votingFixture)
-        //     await rankedChoiceContract.vote(
-        //         owner.address,
-        //         user1.address,
-        //         user2.address
-        //     )
-
-        //     const _candidate1 =
-        //         await rankedChoiceContract.getCandidateByAddress(owner.address)
-        //     const _candidate2 =
-        //         await rankedChoiceContract.getCandidateByAddress(user1.address)
-        //     const _candidate3 =
-        //         await rankedChoiceContract.getCandidateByAddress(user2.address)
-
-        //     assert.equal(_candidate1.firstVotesCount, 3)
-        //     assert.equal(_candidate2.secondVotesCount, 2)
-        //     assert.equal(_candidate3.thirdVotesCount, 1)
-        // })
         it("...checks that after voting, candidate 1 has 3 points", async function () {
             const { rankedChoiceContract, owner, user1, user2, user3 } =
                 await loadFixture(votingFixture)
@@ -311,6 +291,21 @@ describe("RankedChoiceVoting", function () {
             const _candidate3 =
                 await rankedChoiceContract.getCandidateByAddress(user2.address)
             assert.equal(_candidate3.thirdVotesCount, 2)
+        })
+
+        it("...checks that after voting, the voter has hasVoted flag equal to true", async function () {
+            const { rankedChoiceContract, owner, user1, user2 } =
+                await loadFixture(votingFixture)
+            await rankedChoiceContract.vote(
+                owner.address,
+                user1.address,
+                user2.address
+            )
+
+            const _voter = await rankedChoiceContract.getVoterByAddress(
+                owner.address
+            )
+            assert.equal(_voter.hasVoted, true)
         })
     })
 })
