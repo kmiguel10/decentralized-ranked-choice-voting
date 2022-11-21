@@ -11,8 +11,11 @@ error Voting_VoterDoesNotExist(address voterAddress);
 error PhaseTwo_RegisteringPhaseIsOver(address voterAddress);
 error PhaseTwo_EnteringCandidatePhaseIsOver(address voterAddress);
 error PhaseTwo_CannotWithdrawPhaseOneIsOver(address voterAddress);
-error Voting_AlreadyVoted(address voterAddress);
-error Voting_VoterIsNotRegistered(address voterAddress);
+error PhaseTwo_AlreadyVoted(address voterAddress);
+error PhaseTwo_VoterIsNotRegistered(address voterAddress);
+error PhaseTwo_CandidateCannotReceiveMultipleVotesFromTheSameVoter(
+    address voterAddress
+);
 
 /**
  * @title A Ranked Choice Voting Smart Contract
@@ -86,7 +89,8 @@ contract RankedChoiceContract {
     Counters.Counter private candidateIdCounter;
     Counters.Counter private numberOfCandidates;
     Counters.Counter private voterIdCounter;
-    Counters.Counter private numberOfVoters;
+    Counters.Counter public numberOfVoters;
+    Counters.Counter public numberOfVotersVoted;
     uint256 constant FIRST_CHOICE = 3;
     uint256 constant SECOND_CHOICE = 2;
     uint256 constant THIRD_CHOICE = 1;
@@ -253,11 +257,33 @@ contract RankedChoiceContract {
         Voter memory _voter = registeredVoters[msg.sender];
 
         if (_voter.isRegistered == false) {
-            revert Voting_VoterIsNotRegistered(msg.sender);
+            revert PhaseTwo_VoterIsNotRegistered(msg.sender);
         }
 
         if (_voter.hasVoted == true) {
-            revert Voting_AlreadyVoted(msg.sender);
+            revert PhaseTwo_AlreadyVoted(msg.sender);
+        }
+
+        //checks if candidates exist
+        if (checkIfCandidateExist(firstChoice) == false) {
+            revert Voting_CandidateAddressDoesNotExist(firstChoice);
+        }
+        if (checkIfCandidateExist(secondChoice) == false) {
+            revert Voting_CandidateAddressDoesNotExist(secondChoice);
+        }
+        if (checkIfCandidateExist(thirdChoice) == false) {
+            revert Voting_CandidateAddressDoesNotExist(thirdChoice);
+        }
+
+        //checks for candidates must exist - there must be an efficient way, maybe use a mapping
+        if (
+            firstChoice == secondChoice ||
+            firstChoice == thirdChoice ||
+            secondChoice == thirdChoice
+        ) {
+            revert PhaseTwo_CandidateCannotReceiveMultipleVotesFromTheSameVoter(
+                msg.sender
+            );
         }
 
         //need a check for picking same candidate multiple times... cannot happen
@@ -288,8 +314,8 @@ contract RankedChoiceContract {
 
         //change flags
         _voter.hasVoted = true;
-
         registeredVoters[msg.sender] = _voter;
+        numberOfVotersVoted.increment();
 
         //emit event
         emit Voted(

@@ -122,6 +122,20 @@ describe("RankedChoiceVoting", function () {
                 )
                 .withArgs(owner.address)
         })
+
+        it("...returns the number of registered voters", async function () {
+            const { rankedChoiceContract, owner, user1, user2, user3 } =
+                await loadFixture(deployRankedChoiceVotingContract)
+
+            await rankedChoiceContract.enterCandidate("test 1")
+            await rankedChoiceContract.connect(user1).enterCandidate("test 2")
+            await rankedChoiceContract.connect(user2).enterCandidate("test 2")
+            await rankedChoiceContract.connect(user3).registerToVote()
+
+            const _numOfVoters = await rankedChoiceContract.numberOfVoters()
+
+            assert.equal(_numOfVoters, 4)
+        })
     })
 
     describe("Withdraw candidate", function () {
@@ -183,13 +197,6 @@ describe("RankedChoiceVoting", function () {
         })
     })
 
-    //check for event - done
-    //check for updates points for the candidates - done
-    //check that previously voter voter is marked has 'hasVoted' - done
-    //check for errors
-    // - vote again and check for revert
-    // - vote for the same candidates and must be an error
-    // - try voting for a candidate that doesnt exist
     describe("Vote for candidates", function () {
         it("...emits an event after voting for candidates", async function () {
             const { rankedChoiceContract, owner, user1, user2, user3 } =
@@ -306,6 +313,111 @@ describe("RankedChoiceVoting", function () {
                 owner.address
             )
             assert.equal(_voter.hasVoted, true)
+        })
+
+        it("...reverts when attempting to cast vote again after voting", async function () {
+            const { rankedChoiceContract, owner, user1, user2 } =
+                await loadFixture(votingFixture)
+            await rankedChoiceContract.vote(
+                owner.address,
+                user1.address,
+                user2.address
+            )
+            await expect(
+                rankedChoiceContract.vote(
+                    owner.address,
+                    user1.address,
+                    user2.address
+                )
+            )
+                .to.be.revertedWithCustomError(
+                    rankedChoiceContract,
+                    "PhaseTwo_AlreadyVoted"
+                )
+                .withArgs(owner.address)
+        })
+
+        it("...reverts when voting with an unregistered voter", async function () {
+            const { rankedChoiceContract, owner, user1, user2, user3 } =
+                await loadFixture(votingFixture)
+            await rankedChoiceContract.vote(
+                owner.address,
+                user1.address,
+                user2.address
+            )
+            await expect(
+                rankedChoiceContract
+                    .connect(user3)
+                    .vote(owner.address, user1.address, user2.address)
+            )
+                .to.be.revertedWithCustomError(
+                    rankedChoiceContract,
+                    "Voting_VoterDoesNotExist"
+                )
+                .withArgs(user3.address)
+        })
+
+        it("...reverts if candidate receives multiple votes from the same voter", async function () {
+            const { rankedChoiceContract, owner, user1 } = await loadFixture(
+                votingFixture
+            )
+            await expect(
+                rankedChoiceContract.vote(
+                    owner.address,
+                    user1.address,
+                    owner.address
+                )
+            )
+                .to.be.revertedWithCustomError(
+                    rankedChoiceContract,
+                    "PhaseTwo_CandidateCannotReceiveMultipleVotesFromTheSameVoter"
+                )
+                .withArgs(owner.address)
+        })
+
+        it("...reverts if voting for a nonexistent candidate", async function () {
+            const { rankedChoiceContract, owner, user1, user2, user3 } =
+                await loadFixture(votingFixture)
+            await expect(
+                rankedChoiceContract.vote(
+                    owner.address,
+                    user1.address,
+                    user3.address
+                )
+            )
+                .to.be.revertedWithCustomError(
+                    rankedChoiceContract,
+                    "Voting_CandidateAddressDoesNotExist"
+                )
+                .withArgs(user3.address)
+        })
+
+        it("...returns the number of voters who already voted", async function () {
+            const { rankedChoiceContract, owner, user1, user2, user3 } =
+                await loadFixture(votingFixture)
+
+            await rankedChoiceContract.connect(user3).registerToVote()
+
+            await rankedChoiceContract
+                .connect(owner)
+                .vote(owner.address, user1.address, user2.address)
+
+            await rankedChoiceContract
+                .connect(user1)
+                .vote(owner.address, user1.address, user2.address)
+
+            await rankedChoiceContract
+                .connect(user2)
+                .vote(owner.address, user1.address, user2.address)
+
+            await rankedChoiceContract
+                .connect(user3)
+                .vote(owner.address, user1.address, user2.address)
+
+            const _numberOfVotersVoted =
+                await rankedChoiceContract.numberOfVotersVoted()
+
+            assert.equal(_numberOfVotersVoted, 4)
         })
     })
 })
