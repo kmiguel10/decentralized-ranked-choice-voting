@@ -315,7 +315,7 @@ describe("RankedChoiceVoting", function () {
             assert.equal(_voter.hasVoted, true)
         })
 
-        it("...it reverts when attempting to cast vote again after voting", async function () {
+        it("...reverts when attempting to cast vote again after voting", async function () {
             const { rankedChoiceContract, owner, user1, user2 } =
                 await loadFixture(votingFixture)
             await rankedChoiceContract.vote(
