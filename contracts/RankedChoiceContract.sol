@@ -327,6 +327,38 @@ contract RankedChoiceContract {
         );
     }
 
+    /// Phase 3: Count Votes
+    function countVotes() public returns (address) {
+        uint256 highestVote = 0;
+        uint256 totalPossibleVotes = 6 * numberOfVotersVoted.current();
+        uint256 threshold = totalPossibleVotes / 2;
+        address winner = address(0);
+
+        // calculate total votes for each candidates
+        // need to check for edge cases
+        // we can have a helper function for round1
+        for (uint256 i = 0; i < numberOfCandidates.current(); i++) {
+            address _candidateAddress = candidateAddresses[i];
+            Candidate memory _candidate = addressToCandidate[_candidateAddress];
+            _candidate.totalVotesCount =
+                _candidate.firstVotesCount +
+                _candidate.secondVotesCount +
+                _candidate.thirdVotesCount;
+
+            addressToCandidate[_candidateAddress] = _candidate;
+            if (_candidate.totalVotesCount > highestVote) {
+                winner = _candidate.walletAddress;
+            }
+        }
+
+        if (highestVote >= threshold) {
+            return winner;
+        } else {
+            //go to the next round
+            return address(0);
+        }
+    }
+
     /// Getter functions ///
     function getCandidateByAddress(address _candidateAddress)
         external
