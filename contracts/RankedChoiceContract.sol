@@ -49,6 +49,7 @@ contract RankedChoiceContract {
     );
 
     /// Candidate variables ///
+    // we might only need 1st choice vote counts... the rest of the vote counts might only be needed if we alocate the points there for visual and metric analysis for the front end...
     struct Candidate {
         uint256 id;
         string name;
@@ -62,6 +63,7 @@ contract RankedChoiceContract {
     }
 
     ///should I create a voter struct???
+    /// might not actually need firstVote, secondVote, and thirdVote variables
     struct Voter {
         uint256 voterId;
         // string name;
@@ -328,7 +330,18 @@ contract RankedChoiceContract {
     }
 
     /// Phase 3: Count Votes
+
+    /**
+     * @notice this function calculates the votes to get the winner
+     * @dev see pointer below:
+     * 1. If a candidate has >= 50% of the votes + 1 then he/she is the winner
+     * 2. ...if no winner in round 1, go to the next round and distribute the 2nc choice of the 1st choice voters of the eliminated candidate(s)
+     * 3. count again
+     */
     function countVotes() public returns (address) {
+        ///checks
+        //if phase2 is over - check flags
+
         uint256 highestVote = 0;
         uint256 totalPossibleVotes = 6 * numberOfVotersVoted.current();
         uint256 threshold = totalPossibleVotes / 2;
@@ -337,24 +350,22 @@ contract RankedChoiceContract {
         // calculate total votes for each candidates
         // need to check for edge cases
         // we can have a helper function for round1
+        //this can be a helper function
         for (uint256 i = 0; i < numberOfCandidates.current(); i++) {
             address _candidateAddress = candidateAddresses[i];
             Candidate memory _candidate = addressToCandidate[_candidateAddress];
-            _candidate.totalVotesCount =
-                _candidate.firstVotesCount +
-                _candidate.secondVotesCount +
-                _candidate.thirdVotesCount;
-
-            addressToCandidate[_candidateAddress] = _candidate;
-            if (_candidate.totalVotesCount > highestVote) {
+            //if firstVotes count = 0 , then eliminate -- emit event Eliminated_ReceivedZeroFirstChoice()
+            if (_candidate.firstVotesCount > highestVote) {
+                highestVote = _candidate.totalVotesCount;
                 winner = _candidate.walletAddress;
             }
         }
 
         if (highestVote >= threshold) {
+            //change is winnerPicked flag
             return winner;
         } else {
-            //go to the next round
+            //go to the next round - create helper function
             return address(0);
         }
     }
