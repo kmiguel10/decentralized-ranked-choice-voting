@@ -43,6 +43,7 @@ contract RankedChoiceContract {
     event Voted(
         uint256 indexed id,
         address indexed voterAddress,
+        address[] voterChoices,
         address firstChoice,
         address secondChoice,
         address thirdChoice
@@ -54,23 +55,19 @@ contract RankedChoiceContract {
         uint256 id;
         string name;
         address walletAddress;
+        address[] firstChoiceVoters;
         uint256 firstVotesCount;
-        uint256 secondVotesCount;
-        uint256 thirdVotesCount;
         bool isEliminated;
         bool isWinner;
         uint256 totalVotesCount;
     }
 
-    ///should I create a voter struct???
-    /// might not actually need firstVote, secondVote, and thirdVote variables
+    ///Voter choice will be stored in an array , the push and pop nature can be used as a stack, store 3rd choice first and 1st choice last... that way we can keep popping choices for each round.
     struct Voter {
         uint256 voterId;
         // string name;
         address walletAddress;
-        uint256 firstVote;
-        uint256 secondVote;
-        uint256 thirdVote;
+        address[] voterChoices;
         bool hasVoted;
         bool isRegistered;
         bool isCandidate;
@@ -133,12 +130,12 @@ contract RankedChoiceContract {
 
         uint256 _voterId = voterIdCounter.current();
 
+        address[] memory _Voterchoices;
+
         Voter memory voter = Voter(
             _voterId,
             msg.sender,
-            0,
-            0,
-            0,
+            _Voterchoices,
             false,
             true,
             false
@@ -168,6 +165,8 @@ contract RankedChoiceContract {
         numberOfCandidates.increment();
         uint256 _candidateId = candidateIdCounter.current();
 
+        address[] memory _firstChoiceVoters;
+
         //create candidate struct
         // Candidate memory candidate = addressToCandidate[_candidateAddress];
         Candidate memory candidate = Candidate(
@@ -175,8 +174,7 @@ contract RankedChoiceContract {
             _candidateName,
             // _candidateAddress,
             msg.sender,
-            0,
-            0,
+            _firstChoiceVoters,
             0,
             false,
             false,
@@ -256,7 +254,7 @@ contract RankedChoiceContract {
             revert Voting_VoterDoesNotExist(msg.sender);
         }
 
-        Voter memory _voter = registeredVoters[msg.sender];
+        Voter storage _voter = registeredVoters[msg.sender];
 
         if (_voter.isRegistered == false) {
             revert PhaseTwo_VoterIsNotRegistered(msg.sender);
@@ -291,28 +289,19 @@ contract RankedChoiceContract {
         //need a check for picking same candidate multiple times... cannot happen
 
         //updates
-        //look for first choice and add score - can definitely improve this...
+        //look for first choice and add voter to the array of firstChoice voters - can definitely improve this...
         //we are accessing storage multiple times...
-        Candidate memory _firstChoice = addressToCandidate[firstChoice];
-        _firstChoice.firstVotesCount =
-            _firstChoice.firstVotesCount +
-            FIRST_CHOICE;
+        Candidate storage _firstChoice = addressToCandidate[firstChoice];
+        _firstChoice.firstChoiceVoters.push(msg.sender);
+        _firstChoice.firstVotesCount = _firstChoice.firstChoiceVoters.length;
 
         addressToCandidate[firstChoice] = _firstChoice;
 
-        Candidate memory _secondChoice = addressToCandidate[secondChoice];
-        _secondChoice.secondVotesCount =
-            _secondChoice.secondVotesCount +
-            SECOND_CHOICE;
-
-        addressToCandidate[secondChoice] = _secondChoice;
-
-        Candidate memory _thirdChoice = addressToCandidate[thirdChoice];
-        _thirdChoice.thirdVotesCount =
-            _thirdChoice.thirdVotesCount +
-            THIRD_CHOICE;
-
-        addressToCandidate[thirdChoice] = _thirdChoice;
+        //add voter's choices
+        //add 1st choice last in order to pop in this order 1st -> 2nd -> 3rd for each round
+        _voter.voterChoices.push(thirdChoice);
+        _voter.voterChoices.push(secondChoice);
+        _voter.voterChoices.push(firstChoice);
 
         //change flags
         _voter.hasVoted = true;
@@ -323,6 +312,7 @@ contract RankedChoiceContract {
         emit Voted(
             _voter.voterId,
             _voter.walletAddress,
+            _voter.voterChoices,
             firstChoice,
             secondChoice,
             thirdChoice
