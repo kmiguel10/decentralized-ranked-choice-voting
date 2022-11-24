@@ -21,9 +21,15 @@ const config: HardhatUserConfig = {
     networks: {
         hardhat: {
             chainId: 31337,
-            // gasPrice: 130000000000,
+            //gasPrice: 130000000000,
+            gas: "auto",
+            // allowUnlimitedContractSize: true,
+            // throwOnTransactionFailures: true,
+            // throwOnCallFailures: true,
+            // allowUnlimitedContractSize: true,
+            blockGasLimit: 130000000000,
         },
-        localhost: { chainId: 31337 },
+        localhost: { chainId: 31337, gasPrice: 130000000000 },
         goerli: {
             url: GOERLI_RPC_URL,
             accounts: [PRIVATE_KEY],
@@ -42,6 +48,12 @@ const config: HardhatUserConfig = {
                 version: "0.6.6",
             },
         ],
+        settings: {
+            optimizer: {
+                enabled: true,
+                runs: 200,
+            },
+        },
     },
     namedAccounts: {
         deployer: {

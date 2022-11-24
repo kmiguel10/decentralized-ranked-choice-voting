@@ -49,6 +49,18 @@ contract RankedChoiceContract {
         address thirdChoice
     );
 
+    event CountVotes_DeletedReceivedZeroFirstChoiceVotes(
+        address indexed candidateAddress,
+        uint256 firstVoteCounts,
+        uint256 round
+    );
+
+    event CountVotes_CandidateWins(
+        address indexed candidateAddress,
+        uint256 firstVoteCounts,
+        uint256 round
+    );
+
     /// Candidate variables ///
     // we might only need 1st choice vote counts... the rest of the vote counts might only be needed if we alocate the points there for visual and metric analysis for the front end...
     struct Candidate {
@@ -84,7 +96,7 @@ contract RankedChoiceContract {
     bool phaseOneSwitch;
     bool phaseTwoSwitch;
     bool phaseThreeSwitch;
-    bool isWinnerPicked;
+    bool isWinnerPicked; //TODO initialize to false in the constructor
     Counters.Counter private candidateIdCounter;
     Counters.Counter private numberOfCandidates;
     Counters.Counter private voterIdCounter;
@@ -93,6 +105,12 @@ contract RankedChoiceContract {
     uint256 constant FIRST_CHOICE = 3;
     uint256 constant SECOND_CHOICE = 2;
     uint256 constant THIRD_CHOICE = 1;
+
+    /// phase 3 variables
+    //uint256 private highestVote = 0;
+    address private winner;
+    Counters.Counter private round;
+    address[] private firstChoiceVotes_test;
 
     //mapping candidate address to struct
 
@@ -187,7 +205,7 @@ contract RankedChoiceContract {
         //store user address to registeredVoter mapping
         //emit event
 
-        //push to candidate address - might not be necessary
+        //push to candidate address
         candidateAddresses.push(msg.sender);
 
         //emit CandidateRegistered event
@@ -328,35 +346,107 @@ contract RankedChoiceContract {
      * 2. ...if no winner in round 1, go to the next round and distribute the 2nc choice of the 1st choice voters of the eliminated candidate(s)
      * 3. count again
      */
-    function countVotes() public returns (address) {
-        ///checks
+    function countVotes() public returns (address winningCandidate) {
+        ///TODO checks
         //if phase2 is over - check flags
 
-        uint256 highestVote = 0;
-        uint256 totalPossibleVotes = 6 * numberOfVotersVoted.current();
-        uint256 threshold = totalPossibleVotes / 2;
-        address winner = address(0);
+        //uint256 highestVote = 0;
+        uint256 totalPossibleVotes = numberOfVotersVoted.current();
+        uint256 threshold = (totalPossibleVotes / 2) + 1;
+        //Should this be inside the while loop so it will get reset at each iteration
+        //address[] memory firstChoiceVotersOfEliminatedCandidates;
 
-        // calculate total votes for each candidates
-        // need to check for edge cases
-        // we can have a helper function for round1
-        //this can be a helper function
+        //TODO wrap in while loop
+        while (isWinnerPicked == false) {
+            // calculate total votes for each candidates
+            // need to check for edge cases
+            // we can have a helper function for round1
+            //this can be a helper function
+            countFirstChoiceVotes(threshold);
+
+            //can move this inside countFirstChoiceVotes()
+            if (isWinnerPicked) {
+                //TODO - emit event: include round number
+                winningCandidate = winner; //needed to name the return value explicitly
+                return winningCandidate;
+            } else {
+                //TODO go to the next round - create helper function
+                //distribute eliminated candidates - firstChoiceVoter points
+                distributeVotes();
+            }
+        }
+    }
+
+    function distributeVotes() internal {}
+
+    /**
+     * @notice this is a helper function for countVotes() to count firstChoice votes for each candidate
+     *
+     */
+    function countFirstChoiceVotes(uint256 _threshold) private {
+        //TODO
+        //check if there is only 1 remaining candidate - Edge Case
+        delete firstChoiceVotes_test;
+
+        //Increment round number
+        round.increment();
+
+        uint256 highestVote = 0;
+        uint256 lowestVote = 0;
+
+        //array to keep track of lowest vote getters
+        //address[] memory lowestVoteGetters;
+
         for (uint256 i = 0; i < numberOfCandidates.current(); i++) {
+            //There variables will reset after each iteration
             address _candidateAddress = candidateAddresses[i];
+
             Candidate memory _candidate = addressToCandidate[_candidateAddress];
-            //if firstVotes count = 0 , then eliminate -- emit event Eliminated_ReceivedZeroFirstChoice()
-            if (_candidate.firstVotesCount > highestVote) {
-                highestVote = _candidate.totalVotesCount;
+
+            //Delete 0 firstChoice getters
+            if (_candidate.firstVotesCount == 0) {
+                // delete candidate from mapping
+                delete (addressToCandidate[_candidateAddress]);
+
+                //delete candidate from array
+                for (uint256 j = 0; j < candidateAddresses.length; j++) {}
+                //emit Event - received 0 votes
+                emit CountVotes_DeletedReceivedZeroFirstChoiceVotes(
+                    _candidateAddress,
+                    _candidate.firstVotesCount,
+                    round.current()
+                );
+            }
+
+            //record highestVoter
+            if (_candidate.firstVotesCount > _threshold) {
+                highestVote = _candidate.firstVotesCount;
                 winner = _candidate.walletAddress;
+                isWinnerPicked = true;
+                emit CountVotes_CandidateWins(
+                    winner,
+                    highestVote,
+                    round.current()
+                );
+            }
+
+            //get the lowest vote getters at the end of the round and eliminate
+            //and switch the isEliminated flag to true, when distributing votes, make sure to check the flag in order to NOT give the points to an already eliminated candidate
+            //how do we keep track of the lowest votes
+            if (_candidate.firstVotesCount <= lowestVote) {
+                lowestVote = _candidate.firstVotesCount;
             }
         }
 
-        if (highestVote >= threshold) {
-            //change is winnerPicked flag
-            return winner;
-        } else {
-            //go to the next round - create helper function
-            return address(0);
+        //get lowest vote candidates - at this point we know the lowest vote count, so traverse the list of candidates again
+        // save the firstChoiceVoters to array
+        for (uint256 i = 0; i < numberOfCandidates.current(); i++) {
+            address _candidateAddress = candidateAddresses[i];
+            Candidate memory _candidate = addressToCandidate[_candidateAddress];
+
+            for (uint256 j = 0; i < _candidate.firstVotesCount; i++) {
+                firstChoiceVotes_test.push(_candidate.firstChoiceVoters[j]);
+            }
         }
     }
 

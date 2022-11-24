@@ -48,6 +48,32 @@ describe("RankedChoiceVoting", function () {
         return { rankedChoiceContract, owner, user1, user2, user3 }
     }
 
+    //fixture for countVoting - owner votes
+    async function countingVotesFixture() {
+        const [owner, user1, user2, user3] = await ethers.getSigners()
+        const RankedChoiceContract = await ethers.getContractFactory(
+            "RankedChoiceContract"
+        )
+        const rankedChoiceContract = await RankedChoiceContract.deploy()
+        await rankedChoiceContract.deployed()
+        //enter candidates
+        await rankedChoiceContract.enterCandidate("Candidate 1")
+        await rankedChoiceContract.connect(user1).enterCandidate("Candidate 2")
+        await rankedChoiceContract.connect(user2).enterCandidate("Candidate 3")
+
+        //connect back to the main user
+        await rankedChoiceContract.connect(owner)
+
+        //owner votes
+        await rankedChoiceContract.vote(
+            owner.address,
+            user1.address,
+            user2.address
+        )
+
+        return { rankedChoiceContract, owner, user1, user2, user3 }
+    }
+
     describe("Create candidate", function () {
         it("...emits an event after creating a candidate", async function () {
             const { rankedChoiceContract, owner } = await loadFixture(
@@ -438,6 +464,38 @@ describe("RankedChoiceVoting", function () {
                 await rankedChoiceContract.numberOfVotersVoted()
 
             assert.equal(_numberOfVotersVoted, 4)
+        })
+    })
+
+    //TODO checks for countVotes()
+    describe("Count Votes", function () {
+        // test that winner is picked
+        //  - events are emitted
+        //test for checks before counting
+        //  - reverts
+        //test for count()
+        // - 0 1st votes candidates are eliminated
+
+        it("...returns the address of the winner after counting votes", async function () {
+            const { rankedChoiceContract, owner, user1, user2, user3 } =
+                await loadFixture(votingFixture)
+
+            // await rankedChoiceContract
+            //     .connect(user1)
+            //     .vote(owner.address, user1.address, user2.address)
+
+            // await rankedChoiceContract
+            //     .connect(user2)
+            //     .vote(owner.address, user1.address, user2.address)
+
+            // await rankedChoiceContract.connect(owner)
+
+            const winner = await rankedChoiceContract
+                .connect(owner)
+                .countVotes()
+            console.log(owner)
+
+            assert.equal(owner.address, owner.address)
         })
     })
 })
