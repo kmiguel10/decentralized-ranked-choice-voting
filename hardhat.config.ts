@@ -11,6 +11,7 @@ import "@nomiclabs/hardhat-etherscan"
 import "@nomiclabs/hardhat-ethers"
 import "hardhat-gas-reporter"
 import "solidity-coverage"
+import "@nomiclabs/hardhat-web3"
 
 const GOERLI_RPC_URL = process.env.GOERLI_RPC_URL || ""
 const PRIVATE_KEY = process.env.PRIVATE_KEY || ""
@@ -21,13 +22,14 @@ const config: HardhatUserConfig = {
     networks: {
         hardhat: {
             chainId: 31337,
-            //gasPrice: 130000000000,
+            //gasPrice: 130_000_000_000,
             gas: "auto",
             // allowUnlimitedContractSize: true,
             // throwOnTransactionFailures: true,
             // throwOnCallFailures: true,
             // allowUnlimitedContractSize: true,
-            blockGasLimit: 130000000000,
+            blockGasLimit: 330_022_488_000,
+            //gasMultiplier: 2,
         },
         localhost: { chainId: 31337, gasPrice: 130000000000 },
         goerli: {
@@ -49,10 +51,10 @@ const config: HardhatUserConfig = {
             },
         ],
         settings: {
-            optimizer: {
-                enabled: true,
-                runs: 200,
-            },
+            // optimizer: {
+            //     enabled: true,
+            //     runs: 200,
+            // },
         },
     },
     namedAccounts: {
@@ -61,8 +63,15 @@ const config: HardhatUserConfig = {
             1: 0, // similarly on mainnet it will take the first account as deployer. Note though that depending on how hardhat network are configured, the account 0 on one network can be different than on another
         },
     },
+    // gasReporter: {
+    //     enabled: true,
+    // },
     gasReporter: {
         enabled: true,
+        currency: "USD",
+        outputFile: "gas-report.txt",
+        noColors: true,
+        // coinmarketcap: COINMARKETCAP_API_KEY,
     },
 }
 

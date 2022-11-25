@@ -108,7 +108,7 @@ contract RankedChoiceContract {
 
     /// phase 3 variables
     //uint256 private highestVote = 0;
-    address private winner;
+    address public winner;
     Counters.Counter private round;
     address[] private firstChoiceVotes_test;
 
@@ -346,7 +346,7 @@ contract RankedChoiceContract {
      * 2. ...if no winner in round 1, go to the next round and distribute the 2nc choice of the 1st choice voters of the eliminated candidate(s)
      * 3. count again
      */
-    function countVotes() public returns (address winningCandidate) {
+    function countVotes() public {
         ///TODO checks
         //if phase2 is over - check flags
 
@@ -365,15 +365,16 @@ contract RankedChoiceContract {
             countFirstChoiceVotes(threshold);
 
             //can move this inside countFirstChoiceVotes()
-            if (isWinnerPicked) {
-                //TODO - emit event: include round number
-                winningCandidate = winner; //needed to name the return value explicitly
-                return winningCandidate;
-            } else {
-                //TODO go to the next round - create helper function
-                //distribute eliminated candidates - firstChoiceVoter points
-                distributeVotes();
-            }
+            // if (isWinnerPicked == true) {
+            //     //TODO - emit event: include round number
+            //     //winningCandidate = winner; //needed to name the return value explicitly
+            //     //return winner;
+            //     getWinner();
+            // } else {
+            //     //TODO go to the next round - create helper function
+            //     //distribute eliminated candidates - firstChoiceVoter points
+            //     distributeVotes();
+            // }
         }
     }
 
@@ -440,12 +441,16 @@ contract RankedChoiceContract {
 
         //get lowest vote candidates - at this point we know the lowest vote count, so traverse the list of candidates again
         // save the firstChoiceVoters to array
-        for (uint256 i = 0; i < numberOfCandidates.current(); i++) {
-            address _candidateAddress = candidateAddresses[i];
-            Candidate memory _candidate = addressToCandidate[_candidateAddress];
+        if (isWinnerPicked == false) {
+            for (uint256 i = 0; i < numberOfCandidates.current(); i++) {
+                address _candidateAddress = candidateAddresses[i];
+                Candidate memory _candidate = addressToCandidate[
+                    _candidateAddress
+                ];
 
-            for (uint256 j = 0; i < _candidate.firstVotesCount; i++) {
-                firstChoiceVotes_test.push(_candidate.firstChoiceVoters[j]);
+                for (uint256 j = 0; i < _candidate.firstVotesCount; i++) {
+                    firstChoiceVotes_test.push(_candidate.firstChoiceVoters[j]);
+                }
             }
         }
     }
@@ -491,5 +496,10 @@ contract RankedChoiceContract {
 
     function getNumberOfCandidates() public view returns (uint256) {
         return numberOfCandidates.current();
+    }
+
+    function getWinner() public view returns (address) {
+        //check - only allowed to call if isWinnerPicked is true
+        return winner;
     }
 }

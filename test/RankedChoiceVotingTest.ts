@@ -478,24 +478,45 @@ describe("RankedChoiceVoting", function () {
 
         it("...returns the address of the winner after counting votes", async function () {
             const { rankedChoiceContract, owner, user1, user2, user3 } =
-                await loadFixture(votingFixture)
+                await loadFixture(countingVotesFixture)
 
-            // await rankedChoiceContract
-            //     .connect(user1)
-            //     .vote(owner.address, user1.address, user2.address)
+            await rankedChoiceContract
+                .connect(user1)
+                .vote(owner.address, user1.address, user2.address)
 
-            // await rankedChoiceContract
-            //     .connect(user2)
-            //     .vote(owner.address, user1.address, user2.address)
+            await rankedChoiceContract
+                .connect(user2)
+                .vote(owner.address, user1.address, user2.address)
 
-            // await rankedChoiceContract.connect(owner)
+            await rankedChoiceContract.connect(owner)
 
-            const winner = await rankedChoiceContract
-                .connect(owner)
-                .countVotes()
-            console.log(owner)
+            await rankedChoiceContract.connect(owner).countVotes()
 
-            assert.equal(owner.address, owner.address)
+            const winner = await rankedChoiceContract.connect(owner).getWinner()
+
+            assert.equal(winner, owner.address)
+            // expect(
+            //     await rankedChoiceContract.connect(owner).countVotes()
+            // ).to.emit(rankedChoiceContract, "CountVotes_CandidateWins")
+        })
+
+        it("...emits an event after countingVotes and declaring a winner", async function () {
+            const { rankedChoiceContract, owner, user1, user2, user3 } =
+                await loadFixture(countingVotesFixture)
+
+            await rankedChoiceContract
+                .connect(user1)
+                .vote(owner.address, user1.address, user2.address)
+
+            await rankedChoiceContract
+                .connect(user2)
+                .vote(owner.address, user1.address, user2.address)
+
+            await rankedChoiceContract.connect(owner)
+
+            expect(
+                await rankedChoiceContract.connect(owner).countVotes()
+            ).to.emit(rankedChoiceContract, "CountVotes_CandidateWins")
         })
     })
 })
