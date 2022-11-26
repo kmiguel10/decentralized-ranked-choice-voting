@@ -16,6 +16,7 @@ error PhaseTwo_VoterIsNotRegistered(address voterAddress);
 error PhaseTwo_CandidateCannotReceiveMultipleVotesFromTheSameVoter(
     address voterAddress
 );
+error PhaseThree_ThereIsNoWinnerYet();
 
 /**
  * @title A Ranked Choice Voting Smart Contract
@@ -56,6 +57,12 @@ contract RankedChoiceContract {
     );
 
     event CountVotes_CandidateWins(
+        address indexed candidateAddress,
+        uint256 firstVoteCounts,
+        uint256 round
+    );
+
+    event CountVotes_CandidateEliminated(
         address indexed candidateAddress,
         uint256 firstVoteCounts,
         uint256 round
@@ -110,7 +117,7 @@ contract RankedChoiceContract {
     //uint256 private highestVote = 0;
     address public winner;
     Counters.Counter private round;
-    address[] private firstChoiceVotes_test;
+    address[] private firstChoiceVotersAddresses;
 
     //mapping candidate address to struct
 
@@ -364,21 +371,13 @@ contract RankedChoiceContract {
             //this can be a helper function
             countFirstChoiceVotes(threshold);
 
-            //can move this inside countFirstChoiceVotes()
-            // if (isWinnerPicked == true) {
-            //     //TODO - emit event: include round number
-            //     //winningCandidate = winner; //needed to name the return value explicitly
-            //     //return winner;
-            //     getWinner();
-            // } else {
-            //     //TODO go to the next round - create helper function
-            //     //distribute eliminated candidates - firstChoiceVoter points
-            //     distributeVotes();
-            // }
+            //can move this ins
+            //distribute eliminated candidates - firstChoiceVoter points
+            if (isWinnerPicked == false) {
+                distributeVotes();
+            }
         }
     }
-
-    function distributeVotes() internal {}
 
     /**
      * @notice this is a helper function for countVotes() to count firstChoice votes for each candidate
@@ -387,13 +386,13 @@ contract RankedChoiceContract {
     function countFirstChoiceVotes(uint256 _threshold) private {
         //TODO
         //check if there is only 1 remaining candidate - Edge Case
-        delete firstChoiceVotes_test;
+        //delete firstChoiceVotersAddresses; - commented to test clearing this arr at the end of distributeVotes()
 
         //Increment round number
         round.increment();
 
         uint256 highestVote = 0;
-        uint256 lowestVote = 0;
+        uint256 lowestVote = _threshold;
 
         //array to keep track of lowest vote getters
         //address[] memory lowestVoteGetters;
@@ -402,56 +401,125 @@ contract RankedChoiceContract {
             //There variables will reset after each iteration
             address _candidateAddress = candidateAddresses[i];
 
-            Candidate memory _candidate = addressToCandidate[_candidateAddress];
+            if (checkIfCandidateExist(_candidateAddress) == true) {
+                Candidate memory _candidate = addressToCandidate[
+                    _candidateAddress
+                ];
 
-            //Delete 0 firstChoice getters
-            if (_candidate.firstVotesCount == 0) {
-                // delete candidate from mapping
-                delete (addressToCandidate[_candidateAddress]);
+                //Delete 0 firstChoice getters
+                if (_candidate.firstVotesCount == 0) {
+                    // delete candidate from mapping
+                    delete (addressToCandidate[_candidateAddress]);
 
-                //delete candidate from array
-                for (uint256 j = 0; j < candidateAddresses.length; j++) {}
-                //emit Event - received 0 votes
-                emit CountVotes_DeletedReceivedZeroFirstChoiceVotes(
-                    _candidateAddress,
-                    _candidate.firstVotesCount,
-                    round.current()
-                );
-            }
+                    //delete candidate from array
+                    for (uint256 j = 0; j < candidateAddresses.length; j++) {}
+                    //emit Event - received 0 votes
+                    emit CountVotes_DeletedReceivedZeroFirstChoiceVotes(
+                        _candidateAddress,
+                        _candidate.firstVotesCount,
+                        round.current()
+                    );
+                }
 
-            //record highestVoter
-            if (_candidate.firstVotesCount > _threshold) {
-                highestVote = _candidate.firstVotesCount;
-                winner = _candidate.walletAddress;
-                isWinnerPicked = true;
-                emit CountVotes_CandidateWins(
-                    winner,
-                    highestVote,
-                    round.current()
-                );
-            }
+                //record highestVoter
+                if (_candidate.firstVotesCount > _threshold) {
+                    highestVote = _candidate.firstVotesCount;
+                    winner = _candidate.walletAddress;
+                    isWinnerPicked = true;
+                    emit CountVotes_CandidateWins(
+                        winner,
+                        highestVote,
+                        round.current()
+                    );
+                }
 
-            //get the lowest vote getters at the end of the round and eliminate
-            //and switch the isEliminated flag to true, when distributing votes, make sure to check the flag in order to NOT give the points to an already eliminated candidate
-            //how do we keep track of the lowest votes
-            if (_candidate.firstVotesCount <= lowestVote) {
-                lowestVote = _candidate.firstVotesCount;
+                //how do we keep track of the lowest votes
+                if (_candidate.firstVotesCount <= lowestVote) {
+                    lowestVote = _candidate.firstVotesCount;
+                }
             }
         }
 
+        //get the lowest vote getters at the end of the round and eliminate
+        //and switch the isEliminated flag to true, when distributing votes, make sure to check the flag in order to NOT give the points to an already eliminated candidate
         //get lowest vote candidates - at this point we know the lowest vote count, so traverse the list of candidates again
         // save the firstChoiceVoters to array
         if (isWinnerPicked == false) {
             for (uint256 i = 0; i < numberOfCandidates.current(); i++) {
                 address _candidateAddress = candidateAddresses[i];
-                Candidate memory _candidate = addressToCandidate[
-                    _candidateAddress
-                ];
 
-                for (uint256 j = 0; i < _candidate.firstVotesCount; i++) {
-                    firstChoiceVotes_test.push(_candidate.firstChoiceVoters[j]);
+                if (checkIfCandidateExist(_candidateAddress) == true) {
+                    Candidate memory _candidate = addressToCandidate[
+                        _candidateAddress
+                    ];
+
+                    //if candidate received lowest vote, then eliminate and store firstVote voters to array to be distributed
+                    if (_candidate.firstVotesCount == lowestVote) {
+                        _candidate.isEliminated = true;
+                        emit CountVotes_CandidateEliminated(
+                            _candidate.walletAddress,
+                            _candidate.firstVotesCount,
+                            round.current()
+                        );
+                        for (
+                            uint256 j = 0;
+                            i < _candidate.firstVotesCount;
+                            i++
+                        ) {
+                            firstChoiceVotersAddresses.push(
+                                _candidate.firstChoiceVoters[j]
+                            );
+                        }
+                        //delete candidate
+                        delete (addressToCandidate[_candidateAddress]);
+                    }
                 }
             }
+        }
+    }
+
+    /**
+     * @notice this function distributes the first choice votes of the eliminated (lowest) vote candidates to their next ranked candidates
+     */
+    function distributeVotes() internal {
+        //FIXME theres an infinite loop somwhere..NEED to test this manually.. need to break it down to make sure the arrays hold the correct addresses etc... need to create helper functions... for individual tests for each step of the process..
+        //traverse firstChoiceVoters addresses to get address
+        for (uint256 i = 0; i < firstChoiceVotersAddresses.length; i++) {
+            //get Voter
+            Voter storage _voter = registeredVoters[
+                firstChoiceVotersAddresses[i]
+            ];
+
+            //pop the 1st choice vote
+            //need to test that the vote went to the next choice
+            if (_voter.voterChoices.length > 0) {
+                _voter.voterChoices.pop();
+                //access the next choice - get length of voterChoices-1 as index
+                if (_voter.voterChoices.length > 0) {
+                    //distribute vote for the next choice
+                    uint256 index = _voter.voterChoices.length - 1;
+                    //check if candidate exists
+                    if (checkIfCandidateExist(_voter.voterChoices[index])) {
+                        Candidate storage _candidate = addressToCandidate[
+                            _voter.voterChoices[index]
+                        ];
+                        _candidate.firstChoiceVoters.push(_voter.walletAddress);
+                        _candidate.firstVotesCount = _candidate
+                            .firstChoiceVoters
+                            .length;
+
+                        //TODO check if it is necessary to save candidate after updating its array if its already accessed by storage
+                        addressToCandidate[
+                            _voter.voterChoices[index]
+                        ] = _candidate;
+                    } //should we have an else part to give the point to the next choice if the current choice is already eliminated?
+                }
+            }
+        }
+
+        //clear firstChoiceVotersAddresses here
+        while (firstChoiceVotersAddresses.length > 0) {
+            firstChoiceVotersAddresses.pop();
         }
     }
 
@@ -500,6 +568,9 @@ contract RankedChoiceContract {
 
     function getWinner() public view returns (address) {
         //check - only allowed to call if isWinnerPicked is true
+        if (isWinnerPicked == false) {
+            revert PhaseThree_ThereIsNoWinnerYet();
+        }
         return winner;
     }
 }
