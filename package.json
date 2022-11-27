@@ -27,10 +27,16 @@
     "typescript": ">=4.5.0",
     "web3": "^1.8.1"
   },
+  "mocha": {
+    "timeout": 10000000
+  },
   "name": "decentralized-ranked-choice-voting",
   "version": "1.0.0",
   "main": "index.js",
   "repository": "https://github.com/kmiguel10/decentralized-ranked-choice-voting.git",
   "author": "Kent Miguel <kentmiguel10@gmail.com>",
-  "license": "MIT"
+  "license": "MIT",
+  "scripts": {
+    "hh" : "yarn hardhat"
+  }
 }
