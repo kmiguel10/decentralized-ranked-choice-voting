@@ -2,6 +2,7 @@ import { RankedChoiceContract } from "./../typechain-types/RankedChoiceContract"
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers"
 import { expect, assert } from "chai"
 import { ethers } from "hardhat"
+import { ContractFunctionVisibility } from "hardhat/internal/hardhat-network/stack-traces/model"
 
 describe("RankedChoiceVoting", function () {
     //fixture - deploy contract
@@ -112,6 +113,69 @@ describe("RankedChoiceVoting", function () {
             user3,
             user4,
             user5,
+        }
+    }
+
+    async function countVotesFixture_events() {
+        const [owner, user1, user2, user3, user4, user5, user6, user7] =
+            await ethers.getSigners()
+        const RankedChoiceContract = await ethers.getContractFactory(
+            "RankedChoiceContract"
+        )
+        const rankedChoiceContract = await RankedChoiceContract.deploy()
+        await rankedChoiceContract.deployed()
+        //enter candidates
+        await rankedChoiceContract.enterCandidate("Candidate 1")
+        await rankedChoiceContract.connect(user1).enterCandidate("Candidate 2")
+        await rankedChoiceContract.connect(user2).enterCandidate("Candidate 3")
+
+        await rankedChoiceContract.connect(user3).enterCandidate("Candidate 4")
+
+        await rankedChoiceContract.connect(user4).enterCandidate("Candidate 5")
+
+        await rankedChoiceContract.connect(user5).enterCandidate("Candidate 6")
+
+        //connect back to the main user
+        await rankedChoiceContract.connect(owner)
+
+        //voter 1
+        await rankedChoiceContract
+            .connect(owner)
+            .vote(owner.address, user1.address, user2.address)
+        //voter 2
+        await rankedChoiceContract
+            .connect(user1)
+            .vote(owner.address, user1.address, user2.address)
+
+        //voter 3
+        await rankedChoiceContract
+            .connect(user2)
+            .vote(user2.address, user1.address, user5.address)
+
+        //voter 4
+        await rankedChoiceContract
+            .connect(user3)
+            .vote(user3.address, user4.address, user5.address)
+
+        //voter 5
+        await rankedChoiceContract
+            .connect(user4)
+            .vote(user2.address, user1.address, user5.address)
+
+        //voter 6
+        await rankedChoiceContract
+            .connect(user5)
+            .vote(user4.address, owner.address, user5.address)
+
+        return {
+            rankedChoiceContract,
+            owner,
+            user1,
+            user2,
+            user3,
+            user4,
+            user5,
+            user6,
         }
     }
 
@@ -536,7 +600,7 @@ describe("RankedChoiceVoting", function () {
             assert.equal(winner, owner.address)
         })
 
-        it("...emits an event after countingVotes and declaring a winner", async function () {
+        it("...emits an event after getting the majority of votes and declaring a winner ", async function () {
             const { rankedChoiceContract, owner, user1, user2, user3 } =
                 await loadFixture(countingVotesFixture)
 
@@ -550,9 +614,12 @@ describe("RankedChoiceVoting", function () {
 
             await rankedChoiceContract.connect(owner)
 
-            expect(
-                await rankedChoiceContract.connect(owner).countVotes()
-            ).to.emit(rankedChoiceContract, "CountVotes_CandidateWins")
+            expect(await rankedChoiceContract.connect(owner).countVotes())
+                .to.emit(
+                    rankedChoiceContract,
+                    "CountVotes_CandidateWinsThresholdReached"
+                )
+                .withArgs(owner.address, 3, 1)
         })
 
         it("...reverts if getWinner() function is called before votes are counted", async function () {
@@ -625,6 +692,171 @@ describe("RankedChoiceVoting", function () {
             assert.equal(winner, owner.address)
         })
 
+        it("...emits an event after there's only 1 candidate left and declaring a winner", async function () {
+            const { rankedChoiceContract, owner } = await loadFixture(
+                countVotesFixture_events
+            )
+
+            //count votes
+            expect(await rankedChoiceContract.connect(owner).countVotes())
+                .to.emit(
+                    rankedChoiceContract,
+                    "CountVotes_CandidateWinsOnlyCandidateLeft"
+                )
+                .withArgs(owner.address, 3, 2)
+        })
+
         //test a scenario when going to the next round, and distributing the points, the 2nd choice candidate does not exist, but the third does... what do I do? Do i instead give the points to the 3rd candidate?
+
+        //Test for events
+        it("...emits an event after eliminating candidates with 0 votes", async function () {
+            const { rankedChoiceContract, user1 } = await loadFixture(
+                countVotesFixture_events
+            )
+
+            expect(await rankedChoiceContract.countVotes())
+                .to.emit(
+                    rankedChoiceContract,
+                    "CountVotes_DeletedReceivedZeroFirstChoiceVotes"
+                )
+                .withArgs(user1.address, 0, 1)
+        })
+
+        it("...emits an event after eliminating candidates with lowest votes on the first round", async function () {
+            const { rankedChoiceContract, user3 } = await loadFixture(
+                countVotesFixture_events
+            )
+
+            expect(await rankedChoiceContract.countVotes())
+                .to.emit(
+                    rankedChoiceContract,
+                    "CountVotes_CandidateEliminatedLowestVoteCount"
+                )
+                .withArgs(user3.address, 1, 1)
+        })
+
+        it("...emits an event after eliminating candidates with lowest votes on the 2 round", async function () {
+            const { rankedChoiceContract, user2 } = await loadFixture(
+                countVotesFixture_events
+            )
+
+            expect(await rankedChoiceContract.countVotes())
+                .to.emit(
+                    rankedChoiceContract,
+                    "CountVotes_CandidateEliminatedLowestVoteCount"
+                )
+                .withArgs(user2.address, 2, 2)
+        })
+
+        it("...emits an event after distributing votes of an eliminated candidate to the next ranked choice of the voter", async function () {
+            const { rankedChoiceContract, owner, user3, user4 } =
+                await loadFixture(countVotesFixture_events)
+
+            expect(await rankedChoiceContract.countVotes())
+                .to.emit(
+                    rankedChoiceContract,
+                    "CountVotes_CandidateEliminatedLowestVoteCount"
+                )
+                .withArgs(user4.address, user3.address, owner.address, 1)
+        })
+
+        //create a test where the 2nd choice doesnt exist and the 3rd choice is used
+        it("...emits an event after distributing votes where the next choice candidate is eliminated so it skips to the 3rd choice candidate", async function () {
+            const [owner, user1, user2, user3, user4, user5, user6, user7] =
+                await ethers.getSigners()
+            const RankedChoiceContract = await ethers.getContractFactory(
+                "RankedChoiceContract"
+            )
+            const rankedChoiceContract = await RankedChoiceContract.deploy()
+            await rankedChoiceContract.deployed()
+            //enter candidates
+            await rankedChoiceContract.enterCandidate("Candidate 1")
+            await rankedChoiceContract
+                .connect(user1)
+                .enterCandidate("Candidate 2")
+            await rankedChoiceContract
+                .connect(user2)
+                .enterCandidate("Candidate 3")
+
+            await rankedChoiceContract
+                .connect(user3)
+                .enterCandidate("Candidate 4")
+
+            await rankedChoiceContract
+                .connect(user4)
+                .enterCandidate("Candidate 5")
+
+            await rankedChoiceContract
+                .connect(user5)
+                .enterCandidate("Candidate 6")
+
+            //Register to vote
+            await rankedChoiceContract.connect(user6).registerToVote()
+
+            //connect back to the main user
+            await rankedChoiceContract.connect(owner)
+
+            //voter 1
+            await rankedChoiceContract
+                .connect(owner)
+                .vote(owner.address, user1.address, user2.address)
+            //voter 2
+            await rankedChoiceContract
+                .connect(user1)
+                .vote(owner.address, user1.address, user2.address)
+
+            //voter 3
+            await rankedChoiceContract
+                .connect(user2)
+                .vote(user2.address, user1.address, user5.address)
+
+            //voter 4
+            await rankedChoiceContract
+                .connect(user3)
+                .vote(user3.address, user4.address, user5.address)
+
+            //voter 5
+            await rankedChoiceContract
+                .connect(user4)
+                .vote(user2.address, user1.address, user5.address)
+
+            //voter 6
+            await rankedChoiceContract
+                .connect(user5)
+                .vote(user4.address, owner.address, user5.address)
+
+            //add another candidate
+            //  await rankedChoiceContract.connect(user6).registerToVote();
+
+            await rankedChoiceContract
+                .connect(user6)
+                .vote(user5.address, user1.address, owner.address)
+
+            expect(await rankedChoiceContract.countVotes())
+                .to.emit(
+                    rankedChoiceContract,
+                    "CountVotes_SecondChoiceIsEliminated"
+                )
+                .withArgs(user6.address, owner.address, 1)
+        })
+
+        it("...emits an event after distributing votes where all voter choices are eliminated", async function () {
+            const { rankedChoiceContract, user3 } = await loadFixture(
+                countVotesFixture_events
+            )
+
+            expect(await rankedChoiceContract.countVotes())
+                .to.emit(
+                    rankedChoiceContract,
+                    "CountVotes_VoterChoicesAreAllEliminated"
+                )
+                .withArgs(user3.address, 1)
+        })
+
+        //create tests for TIED votes scenarios
+
+        //all eliminated tie votes in first round
+
+        //and tie votes on the final rounds
     })
 })

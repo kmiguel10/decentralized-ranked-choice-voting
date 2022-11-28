@@ -57,15 +57,40 @@ contract RankedChoiceContract {
         uint256 round
     );
 
-    event CountVotes_CandidateWins(
+    event CountVotes_CandidateWinsThresholdReached(
         address indexed candidateAddress,
         uint256 firstVoteCounts,
         uint256 round
     );
 
-    event CountVotes_CandidateEliminated(
+    event CountVotes_CandidateWinsOnlyCandidateLeft(
         address indexed candidateAddress,
         uint256 firstVoteCounts,
+        uint256 round
+    );
+
+    event CountVotes_CandidateEliminatedLowestVoteCount(
+        address indexed candidateAddress,
+        uint256 firstVoteCounts,
+        uint256 round
+    );
+
+    event CountVotes_CandidateReceivedVoterFromTo(
+        address indexed voterAddress,
+        address fromCandidate,
+        address toCandidate,
+        uint256 round
+    );
+
+    //Emit event 2nd choice doesnt exist so give vote to 3rd choice
+    event CountVotes_SecondChoiceIsEliminated(
+        address indexed voterAddress,
+        address thirdChoice,
+        uint256 round
+    );
+
+    event CountVotes_VoterChoicesAreAllEliminated(
+        address indexed voterAddress,
         uint256 round
     );
 
@@ -270,8 +295,6 @@ contract RankedChoiceContract {
      * @notice this function allows voters to vote their choices in the election
      * @dev come back to implement checks:
      * 1. phase switches
-     * 2. flags: isRegistered, hasVoted
-     * 3. Update points for candidate structs
      */
     function vote(
         address firstChoice,
@@ -474,7 +497,7 @@ contract RankedChoiceContract {
                     winner = _candidate.walletAddress;
                     isWinnerPicked = true;
                     console.log("Reached threshhold found winner", winner);
-                    emit CountVotes_CandidateWins(
+                    emit CountVotes_CandidateWinsThresholdReached(
                         winner,
                         highestVote,
                         round.current()
@@ -521,7 +544,7 @@ contract RankedChoiceContract {
                     //if candidate received lowest vote, then eliminate and store firstVote voters to array to be distributed
                     if (_candidate.firstVotesCount == lowestVote) {
                         _candidate.isEliminated = true;
-                        emit CountVotes_CandidateEliminated(
+                        emit CountVotes_CandidateEliminatedLowestVoteCount(
                             _candidate.walletAddress,
                             _candidate.firstVotesCount,
                             round.current()
@@ -572,7 +595,7 @@ contract RankedChoiceContract {
                 winner = _candidate.walletAddress;
                 isWinnerPicked = true;
                 console.log("Only one candidate left, found winner", winner);
-                emit CountVotes_CandidateWins(
+                emit CountVotes_CandidateWinsOnlyCandidateLeft(
                     winner,
                     highestVote,
                     round.current()
@@ -600,18 +623,59 @@ contract RankedChoiceContract {
                 firstChoiceVotersAddresses[i]
             ];
 
-            console.log("Distribute voter: ", firstChoiceVotersAddresses[i]);
+            console.log(
+                "--- Distribute voter: ---",
+                firstChoiceVotersAddresses[i]
+            );
 
             //pop the 1st choice vote
             //need to test that the vote went to the next choice
             if (_voter.voterChoices.length > 0) {
+                address _fromCandidate = _voter.voterChoices[
+                    _voter.voterChoices.length - 1
+                ];
                 _voter.voterChoices.pop();
                 //access the next choice - get length of voterChoices-1 as index
                 if (_voter.voterChoices.length > 0) {
                     //distribute vote for the next choice
                     uint256 index = _voter.voterChoices.length - 1;
-                    //check if candidate exists
-                    if (checkIfCandidateExist(_voter.voterChoices[index])) {
+                    //check if the second choice is already eliminated, then pop and use the 3rd choice
+                    if (
+                        checkIfCandidateExist(_voter.voterChoices[index]) ==
+                        false
+                    ) {
+                        _voter.voterChoices.pop();
+                        if (_voter.voterChoices.length > 0) {
+                            index = _voter.voterChoices.length - 1;
+                            console.log(
+                                "Next candidate is eliminated so choose the next choice candidate",
+                                _voter.voterChoices[index],
+                                ", from voter : ",
+                                _voter.walletAddress
+                            );
+                            //Emit event 2nd choice doesnt exist so give vote to 3rd choice
+                            emit CountVotes_SecondChoiceIsEliminated(
+                                _voter.walletAddress,
+                                _voter.voterChoices[index],
+                                round.current()
+                            );
+                        } else {
+                            console.log(
+                                "All of the voter's candidate are eliminated for voter: ",
+                                _voter.walletAddress
+                            );
+                            //Emit event NoMoreVotesToDistributeForVoter
+                            emit CountVotes_VoterChoicesAreAllEliminated(
+                                _voter.walletAddress,
+                                round.current()
+                            );
+                        }
+                    }
+                    //check if candidate exists and index is within bounds
+                    if (
+                        checkIfCandidateExist(_voter.voterChoices[index]) &&
+                        index >= 0
+                    ) {
                         Candidate storage _candidate = addressToCandidate[
                             _voter.voterChoices[index]
                         ];
@@ -625,13 +689,34 @@ contract RankedChoiceContract {
                             _voter.voterChoices[index]
                         );
 
-                        //             //TODO check if it is necessary to save candidate after updating its array if its already accessed by storage
+                        emit CountVotes_CandidateReceivedVoterFromTo(
+                            _voter.walletAddress,
+                            _fromCandidate,
+                            _voter.voterChoices[index],
+                            round.current()
+                        );
+
+                        console.log("Voter Address", _voter.walletAddress);
+                        console.log("From", _fromCandidate);
+                        console.log("to", _voter.voterChoices[index]);
+
+                        //TODO check if it is necessary to save candidate after updating its array if its already accessed by storage
                         addressToCandidate[
                             _voter.voterChoices[index]
                         ] = _candidate;
+                    } else {
+                        console.log(
+                            "All of the voter's candidate are eliminated",
+                            _voter.walletAddress
+                        );
+                        emit CountVotes_VoterChoicesAreAllEliminated(
+                            _voter.walletAddress,
+                            round.current()
+                        );
                     } //should we have an else part to give the point to the next choice if the current choice is already eliminated?
                 }
             }
+            console.log("--- Done distributing for this voter ---");
         }
 
         //clear firstChoiceVotersAddresses here
