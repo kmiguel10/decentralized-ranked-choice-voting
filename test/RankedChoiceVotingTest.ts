@@ -592,7 +592,6 @@ describe("RankedChoiceVoting", function () {
             await rankedChoiceContract
                 .connect(owner)
                 .vote(owner.address, user1.address, user2.address)
-
             //voter 2
             await rankedChoiceContract
                 .connect(user1)

@@ -393,7 +393,7 @@ contract RankedChoiceContract {
                 firstChoiceVotersAddresses.length
             );
             console.log(
-                "Number of active voters left: ",
+                "Number of active candidates left: ",
                 activeCandidatesCounter.current()
             );
             if (isWinnerPicked == false) {
@@ -423,8 +423,8 @@ contract RankedChoiceContract {
 
         //Increment round number
         round.increment();
-
-        console.log("Round: ", round.current());
+        console.log("----- Count first Choice votes -----");
+        console.log("ROUND: ", round.current());
 
         uint256 highestVote = 0;
         uint256 lowestVote = _threshold;
@@ -437,8 +437,6 @@ contract RankedChoiceContract {
 
         //array to keep track of lowest vote getters
         //address[] memory lowestVoteGetters;
-
-        console.log("Counting votes");
         console.log("Number of candidates", numberOfCandidates.current());
 
         for (uint256 i = 0; i < numberOfCandidates.current(); i++) {
@@ -451,11 +449,15 @@ contract RankedChoiceContract {
                 ];
 
                 console.log("Checking candidate: ", _candidateAddress);
+                console.log("Candidate index: ", i);
                 console.log("Number of votes: ", _candidate.firstVotesCount);
 
                 //Delete 0 firstChoice getters
                 if (_candidate.firstVotesCount == 0) {
-                    console.log("Deleting candidate", _candidateAddress);
+                    console.log(
+                        "Deleting 0 vote candidate: ",
+                        _candidateAddress
+                    );
                     // delete candidate from mapping
                     delete (addressToCandidate[_candidateAddress]);
 
@@ -471,21 +473,31 @@ contract RankedChoiceContract {
                     highestVote = _candidate.firstVotesCount;
                     winner = _candidate.walletAddress;
                     isWinnerPicked = true;
-                    console.log("Found winner", winner);
+                    console.log("Reached threshhold found winner", winner);
                     emit CountVotes_CandidateWins(
                         winner,
                         highestVote,
                         round.current()
                     );
-                } else if (_candidate.firstVotesCount <= lowestVote) {
-                    //how do we keep track of the lowest votes
-                    lowestVote = _candidate.firstVotesCount;
-                    console.log("lowestVote after comparison", lowestVote);
-                } else if (_candidate.firstVotesCount > highestVote) {
-                    //keeps track of highest vote
-                    highestVote = _candidate.firstVotesCount;
-                    console.log("highestVote after comparison", lowestVote);
                 }
+                //Compare vote count if candidate is still active
+                if (checkIfCandidateExist(_candidateAddress) == true) {
+                    if (_candidate.firstVotesCount <= lowestVote) {
+                        //how do we keep track of the lowest votes
+                        lowestVote = _candidate.firstVotesCount;
+                        console.log("lowestVote after comparison", lowestVote);
+                    }
+                    if (_candidate.firstVotesCount > highestVote) {
+                        //keeps track of highest vote
+                        highestVote = _candidate.firstVotesCount;
+                        console.log("highestVote after comparison", lowestVote);
+                    }
+                }
+
+                console.log(
+                    "--- Finished counting votes for candidate ----",
+                    i
+                );
             }
         }
 
@@ -493,8 +505,11 @@ contract RankedChoiceContract {
         //and switch the isEliminated flag to true, when distributing votes, make sure to check the flag in order to NOT give the points to an already eliminated candidate
         //get lowest vote candidates - at this point we know the lowest vote count, so traverse the list of candidates again
         // save the firstChoiceVoters to array
-
         if (isWinnerPicked == false) {
+            console.log("--- Start eliminating lowest vote candidates ----");
+            console.log("Highest vote", highestVote);
+            console.log("Lowest vote", lowestVote);
+
             for (uint256 i = 0; i < numberOfCandidates.current(); i++) {
                 address _candidateAddress = candidateAddresses[i];
 
@@ -502,8 +517,6 @@ contract RankedChoiceContract {
                     Candidate memory _candidate = addressToCandidate[
                         _candidateAddress
                     ];
-
-                    console.log("Received lowest votes", _candidateAddress);
 
                     //if candidate received lowest vote, then eliminate and store firstVote voters to array to be distributed
                     if (_candidate.firstVotesCount == lowestVote) {
@@ -513,7 +526,18 @@ contract RankedChoiceContract {
                             _candidate.firstVotesCount,
                             round.current()
                         );
+                        console.log(
+                            "Candidate received the lowest votes and eliminated",
+                            _candidate.walletAddress
+                        );
+                        console.log(
+                            "...with vote count: ",
+                            _candidate.firstVotesCount
+                        );
                         if (_candidate.firstVotesCount > 0) {
+                            console.log(
+                                "These voters will go to their next choice: "
+                            );
                             for (
                                 uint256 j = 0;
                                 j < _candidate.firstVotesCount;
@@ -523,7 +547,7 @@ contract RankedChoiceContract {
                                     _candidate.firstChoiceVoters[j]
                                 );
                                 console.log(
-                                    "These voters will go to their next choice: ",
+                                    "...",
                                     _candidate.firstChoiceVoters[j]
                                 );
                             }
@@ -533,24 +557,29 @@ contract RankedChoiceContract {
                         delete (addressToCandidate[_candidateAddress]);
                         activeCandidatesCounter.decrement();
                     }
-
-                    if (
-                        // _candidate.firstVotesCount == highestVote &&
-                        activeCandidatesCounter.current() == 1
-                    ) {
-                        // if there is only 1 active candidate left then that is the winner
-                        highestVote = _candidate.firstVotesCount;
-                        winner = _candidate.walletAddress;
-                        isWinnerPicked = true;
-                        console.log("Found winner", winner);
-                        emit CountVotes_CandidateWins(
-                            winner,
-                            highestVote,
-                            round.current()
-                        );
+                    //save candidate with highestVote as winner
+                    if (_candidate.firstVotesCount == highestVote) {
+                        winner = winner = _candidate.walletAddress;
                     }
                 }
             }
+
+            //at the end of the loop evaluate if there's only 1 candidate left
+            if (activeCandidatesCounter.current() == 1) {
+                Candidate memory _candidate = addressToCandidate[winner];
+                // if there is only 1 active candidate left then that is the winner
+                highestVote = _candidate.firstVotesCount;
+                winner = _candidate.walletAddress;
+                isWinnerPicked = true;
+                console.log("Only one candidate left, found winner", winner);
+                emit CountVotes_CandidateWins(
+                    winner,
+                    highestVote,
+                    round.current()
+                );
+            }
+
+            console.log("---Finished eliminating lowest vote candidates ---");
         }
     }
 
@@ -561,7 +590,7 @@ contract RankedChoiceContract {
         //FIXME theres an infinite loop somwhere..NEED to test this manually.. need to break it down to make sure the arrays hold the correct addresses etc... need to create helper functions... for individual tests for each step of the process..
         //traverse firstChoiceVoters addresses to get address
         console.log(
-            "No winner last round so will distribute vote",
+            "--- Distribute votes from lowest vote candidates ---",
             firstChoiceVotersAddresses.length
         );
 
@@ -592,7 +621,7 @@ contract RankedChoiceContract {
                             .length;
 
                         console.log(
-                            "Candidate received vote",
+                            "Candidate received vote from voter: ",
                             _voter.voterChoices[index]
                         );
 
@@ -614,6 +643,8 @@ contract RankedChoiceContract {
             "firstChoiceVotersAddresses.length",
             firstChoiceVotersAddresses.length
         );
+
+        console.log("--- Finished Distributing Votes ---");
     }
 
     /// Getter functions ///
