@@ -94,6 +94,8 @@ contract RankedChoiceContract {
         uint256 round
     );
 
+    event CountVotes_AllCandidatesAreTiedAfterCount(uint256 round);
+
     /// Candidate variables ///
     // we might only need 1st choice vote counts... the rest of the vote counts might only be needed if we alocate the points there for visual and metric analysis for the front end...
     struct Candidate {
@@ -130,6 +132,7 @@ contract RankedChoiceContract {
     bool phaseTwoSwitch;
     bool phaseThreeSwitch;
     bool isWinnerPicked; //TODO initialize to false in the constructor
+    bool areAllActiveCandidatesTied; //initialize to false in constructor
     Counters.Counter private candidateIdCounter;
     Counters.Counter private numberOfCandidates;
     Counters.Counter private voterIdCounter;
@@ -384,20 +387,10 @@ contract RankedChoiceContract {
     function countVotes() public {
         ///TODO checks
         //if phase2 is over - check flags
-
-        //uint256 highestVote = 0;
         uint256 totalPossibleVotes = numberOfVotersVoted.current();
         uint256 threshold = (totalPossibleVotes / 2) + 1;
-        //Should this be inside the while loop so it will get reset at each iteration
-        //address[] memory firstChoiceVotersOfEliminatedCandidates;
 
-        //TODO wrap in while loop
-        console.log(
-            "isWinnerPicked before entering while loop",
-            isWinnerPicked
-        );
-
-        while (isWinnerPicked == false) {
+        while (isWinnerPicked == false && areAllActiveCandidatesTied == false) {
             // calculate total votes for each candidates
             // need to check for edge cases
             // we can have a helper function for round1
@@ -420,19 +413,22 @@ contract RankedChoiceContract {
                 "Number of active candidates left: ",
                 activeCandidatesCounter.current()
             );
-            if (isWinnerPicked == false) {
+            if (
+                isWinnerPicked == false && areAllActiveCandidatesTied == false
+            ) {
                 console.log("Distributing votes");
                 distributeVotes();
+                console.log(
+                    "Number of candidates after distributing votes",
+                    activeCandidatesCounter.current()
+                );
+            } else if (
+                isWinnerPicked == false && areAllActiveCandidatesTied == true
+            ) {
+                //emit event
+                console.log("All candidates are tied after counting votes");
+                emit CountVotes_AllCandidatesAreTiedAfterCount(round.current());
             }
-
-            console.log(
-                "Number of candidates after distributing votes",
-                activeCandidatesCounter.current()
-            );
-
-            //TODO delete, this is for testing..
-            //isWinnerPicked = true;
-            //testFlag = testFlag - 1;
         }
     }
 
@@ -528,12 +524,17 @@ contract RankedChoiceContract {
                 );
             }
         }
+        //Evaluate if all candidates are tied after counting votes
+        if (highestVote == lowestVote) {
+            //this means there is a tie
+            areAllActiveCandidatesTied = true;
+        }
 
         //get the lowest vote getters at the end of the round and eliminate
         //and switch the isEliminated flag to true, when distributing votes, make sure to check the flag in order to NOT give the points to an already eliminated candidate
         //get lowest vote candidates - at this point we know the lowest vote count, so traverse the list of candidates again
         // save the firstChoiceVoters to array
-        if (isWinnerPicked == false) {
+        if (isWinnerPicked == false && areAllActiveCandidatesTied == false) {
             console.log("--- Start eliminating lowest vote candidates ----");
             console.log("Highest vote", highestVote);
             console.log("Lowest vote", lowestVote);

@@ -856,8 +856,105 @@ describe("RankedChoiceVoting", function () {
         //create tests for TIED votes scenarios
 
         //all eliminated tie votes in first round
-        it("...emits an event if all candidates tie in the 1st round of counting votes", async function () {})
+        it("...emits an event if all candidates tie in the 1st round of counting votes", async function () {
+            const { rankedChoiceContract, owner, user1, user2, user3 } =
+                await loadFixture(votingFixture)
+
+            await rankedChoiceContract
+                .connect(owner)
+                .vote(owner.address, user1.address, user2.address)
+
+            await rankedChoiceContract
+                .connect(user1)
+                .vote(user1.address, user2.address, owner.address)
+
+            await rankedChoiceContract
+                .connect(user2)
+                .vote(user2.address, owner.address, user1.address)
+
+            expect(await rankedChoiceContract.countVotes())
+                .to.emit(
+                    rankedChoiceContract,
+                    "CountVotes_AllCandidatesAreTiedAfterCount"
+                )
+                .withArgs(1)
+        })
+
         //and tie votes on the final rounds
-        it("...emits an event if there is a tie after the first round of counting votes", async function () {})
+        it("...emits an event if there is a tie after the first round of counting votes", async function () {
+            const [owner, user1, user2, user3, user4, user5] =
+                await ethers.getSigners()
+            const RankedChoiceContract = await ethers.getContractFactory(
+                "RankedChoiceContract"
+            )
+            const rankedChoiceContract = await RankedChoiceContract.deploy()
+            await rankedChoiceContract.deployed()
+            //enter candidates
+            await rankedChoiceContract.enterCandidate("Candidate 1")
+            await rankedChoiceContract
+                .connect(user1)
+                .enterCandidate("Candidate 2")
+            await rankedChoiceContract
+                .connect(user2)
+                .enterCandidate("Candidate 3")
+
+            await rankedChoiceContract
+                .connect(user3)
+                .enterCandidate("Candidate 4")
+
+            await rankedChoiceContract
+                .connect(user4)
+                .enterCandidate("Candidate 5")
+
+            await rankedChoiceContract
+                .connect(user5)
+                .enterCandidate("Candidate 6")
+
+            //connect back to the main user
+            await rankedChoiceContract.connect(owner)
+
+            //voter 1
+            await rankedChoiceContract
+                .connect(owner)
+                .vote(owner.address, user1.address, user2.address)
+            //voter 2
+            await rankedChoiceContract
+                .connect(user1)
+                .vote(owner.address, user1.address, user2.address)
+
+            //voter 3
+            await rankedChoiceContract
+                .connect(user2)
+                .vote(user2.address, user1.address, user5.address)
+
+            //voter 4
+            await rankedChoiceContract
+                .connect(user3)
+                .vote(user3.address, user2.address, user5.address)
+
+            //voter 5
+            await rankedChoiceContract
+                .connect(user4)
+                .vote(user2.address, user1.address, user5.address)
+
+            //voter 6
+            await rankedChoiceContract
+                .connect(user5)
+                .vote(user4.address, owner.address, user5.address)
+
+            expect(await rankedChoiceContract.countVotes())
+                .to.emit(
+                    rankedChoiceContract,
+                    "CountVotes_CandidateEliminatedLowestVoteCount"
+                )
+                .withArgs(user4.address, user3.address, owner.address, 1)
+
+            expect(await rankedChoiceContract.countVotes())
+                .to.emit(
+                    rankedChoiceContract,
+                    "CountVotes_AllCandidatesAreTiedAfterCount"
+                )
+                .withArgs(2)
+        })
     })
 })
