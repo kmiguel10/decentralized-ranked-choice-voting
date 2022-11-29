@@ -89,7 +89,7 @@ contract RankedChoiceContract {
         uint256 round
     );
 
-    event CountVotes_VoterChoicesAreAllEliminated(
+    event CountVotes_ExhaustedVoterChoices(
         address indexed voterAddress,
         uint256 round
     );
@@ -295,6 +295,7 @@ contract RankedChoiceContract {
      * @notice this function allows voters to vote their choices in the election
      * @dev come back to implement checks:
      * 1. phase switches
+     * 2. Undervote is not allowed meaning all voters must choose three candidates in order to cast vote
      */
     function vote(
         address firstChoice,
@@ -426,7 +427,7 @@ contract RankedChoiceContract {
 
             console.log(
                 "Number of candidates after distributing votes",
-                numberOfCandidates.current()
+                activeCandidatesCounter.current()
             );
 
             //TODO delete, this is for testing..
@@ -446,7 +447,7 @@ contract RankedChoiceContract {
 
         //Increment round number
         round.increment();
-        console.log("----- Count first Choice votes -----");
+        console.log("----- COUNT FIRST CHOICE VOTES -----");
         console.log("ROUND: ", round.current());
 
         uint256 highestVote = 0;
@@ -460,7 +461,7 @@ contract RankedChoiceContract {
 
         //array to keep track of lowest vote getters
         //address[] memory lowestVoteGetters;
-        console.log("Number of candidates", numberOfCandidates.current());
+        console.log("Number of candidates", activeCandidatesCounter.current());
 
         for (uint256 i = 0; i < numberOfCandidates.current(); i++) {
             //There variables will reset after each iteration
@@ -471,8 +472,12 @@ contract RankedChoiceContract {
                     _candidateAddress
                 ];
 
-                console.log("Checking candidate: ", _candidateAddress);
-                console.log("Candidate index: ", i);
+                console.log(
+                    "----- Checking candidate: -----",
+                    _candidateAddress,
+                    " at index ",
+                    i
+                );
                 console.log("Number of votes: ", _candidate.firstVotesCount);
 
                 //Delete 0 firstChoice getters
@@ -648,7 +653,7 @@ contract RankedChoiceContract {
                         if (_voter.voterChoices.length > 0) {
                             index = _voter.voterChoices.length - 1;
                             console.log(
-                                "Next candidate is eliminated so choose the next choice candidate",
+                                "Next candidate is eliminated so distribute the next choice candidate (3rd voter) :",
                                 _voter.voterChoices[index],
                                 ", from voter : ",
                                 _voter.walletAddress
@@ -665,7 +670,7 @@ contract RankedChoiceContract {
                                 _voter.walletAddress
                             );
                             //Emit event NoMoreVotesToDistributeForVoter
-                            emit CountVotes_VoterChoicesAreAllEliminated(
+                            emit CountVotes_ExhaustedVoterChoices(
                                 _voter.walletAddress,
                                 round.current()
                             );
@@ -709,7 +714,7 @@ contract RankedChoiceContract {
                             "All of the voter's candidate are eliminated",
                             _voter.walletAddress
                         );
-                        emit CountVotes_VoterChoicesAreAllEliminated(
+                        emit CountVotes_ExhaustedVoterChoices(
                             _voter.walletAddress,
                             round.current()
                         );
@@ -733,41 +738,33 @@ contract RankedChoiceContract {
     }
 
     /// Getter functions ///
-    function getCandidateByAddress(address _candidateAddress)
-        external
-        view
-        returns (Candidate memory)
-    {
+    function getCandidateByAddress(
+        address _candidateAddress
+    ) external view returns (Candidate memory) {
         if (addressToCandidate[_candidateAddress].id <= 0) {
             revert Voting_CandidateAddressDoesNotExist(_candidateAddress);
         }
         return addressToCandidate[_candidateAddress];
     }
 
-    function getVoterByAddress(address _voterAddress)
-        external
-        view
-        returns (Voter memory)
-    {
+    function getVoterByAddress(
+        address _voterAddress
+    ) external view returns (Voter memory) {
         if (registeredVoters[_voterAddress].voterId <= 0) {
             revert Voting_VoterDoesNotExist(_voterAddress);
         }
         return registeredVoters[_voterAddress];
     }
 
-    function checkIfCandidateExist(address _candidateAddress)
-        public
-        view
-        returns (bool)
-    {
+    function checkIfCandidateExist(
+        address _candidateAddress
+    ) public view returns (bool) {
         return (addressToCandidate[_candidateAddress].id > 0) ? true : false;
     }
 
-    function checkIfVoterExist(address _voterAddress)
-        public
-        view
-        returns (bool)
-    {
+    function checkIfVoterExist(
+        address _voterAddress
+    ) public view returns (bool) {
         return (registeredVoters[_voterAddress].voterId > 0) ? true : false;
     }
 

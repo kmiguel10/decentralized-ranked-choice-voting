@@ -848,7 +848,7 @@ describe("RankedChoiceVoting", function () {
             expect(await rankedChoiceContract.countVotes())
                 .to.emit(
                     rankedChoiceContract,
-                    "CountVotes_VoterChoicesAreAllEliminated"
+                    "CountVotes_ExhaustedVoterChoices"
                 )
                 .withArgs(user3.address, 1)
         })
@@ -856,7 +856,8 @@ describe("RankedChoiceVoting", function () {
         //create tests for TIED votes scenarios
 
         //all eliminated tie votes in first round
-
+        it("...emits an event if all candidates tie in the 1st round of counting votes", async function () {})
         //and tie votes on the final rounds
+        it("...emits an event if there is a tie after the first round of counting votes", async function () {})
     })
 })
