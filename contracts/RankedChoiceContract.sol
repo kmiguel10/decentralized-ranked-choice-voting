@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "hardhat/console.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// Errors ///
 error Voting_CandidateAlreadyExists(address candidateAddress);
@@ -22,12 +23,14 @@ error PhaseThree_ThereIsNoWinnerYet();
 /**
  * @title A Ranked Choice Voting Smart Contract
  * @author Kent Miguel
- * @dev uses chainlink automation to end register, voting, and count phases
+ * @dev uses chainlink automation to end and start register, voting, and count phases
  */
 contract RankedChoiceContract {
     using Counters for Counters.Counter;
 
-    //Events
+    /////////////////////
+    //     Events      //
+    /////////////////////
     event CandidateCreated(
         uint256 indexed id,
         string indexed name,
@@ -120,12 +123,10 @@ contract RankedChoiceContract {
         bool isCandidate;
     }
 
-    address[] private candidateAddresses; //array of candidates
+    address[] private candidateAddresses; //array of candidates - might be able to make enumerable
     //mapping(uint256 => mapping(address => Candidate)) private addressToCandidate;
-    mapping(address => Candidate) private addressToCandidate;
-    mapping(address => Voter) private registeredVoters;
-
-    /// Voter variables ///
+    mapping(address => Candidate) private addressToCandidate; //TODO might be a good idea to use enumerable type from OpenZeppeling
+    mapping(address => Voter) private registeredVoters; //TODO might be a good idea to use enumerable type from OpenZeppeling
 
     /// Election global variables ///
     bool phaseOneSwitch;
@@ -143,88 +144,86 @@ contract RankedChoiceContract {
     uint256 constant THIRD_CHOICE = 1;
 
     /// phase 3 variables
-    //uint256 private highestVote = 0;
     address public winner;
     Counters.Counter private round;
-    address[] private firstChoiceVotersAddresses;
+    address[] private firstChoiceVotersAddresses; //might be able to make enumerable
     Counters.Counter private activeCandidatesCounter;
 
-    //mapping candidate address to struct
+    /////////////////////
+    ///  Modifiers  ///
+    /////////////////////
+    modifier onlyExistingVoter() {
+        if (checkIfVoterExist(msg.sender) == false) {
+            revert Voting_VoterDoesNotExist(msg.sender);
+        }
+        _;
+    }
 
+    modifier onlyExistingCandidateChoices(
+        address firstChoice,
+        address secondChoice,
+        address thirdChoice
+    ) {
+        //checks if candidates exist
+        if (checkIfCandidateExist(firstChoice) == false) {
+            revert Voting_CandidateAddressDoesNotExist(firstChoice);
+        }
+        if (checkIfCandidateExist(secondChoice) == false) {
+            revert Voting_CandidateAddressDoesNotExist(secondChoice);
+        }
+        if (checkIfCandidateExist(thirdChoice) == false) {
+            revert Voting_CandidateAddressDoesNotExist(thirdChoice);
+        }
+        _;
+    }
+
+    modifier onlyUniqueChoices(
+        address firstChoice,
+        address secondChoice,
+        address thirdChoice
+    ) {
+        //checks for candidates must exist - there must be an efficient way, maybe use a mapping
+        if (
+            firstChoice == secondChoice ||
+            firstChoice == thirdChoice ||
+            secondChoice == thirdChoice
+        ) {
+            revert PhaseTwo_CandidateCannotReceiveMultipleVotesFromTheSameVoter(
+                msg.sender
+            );
+        }
+        _;
+    }
+
+    //TODO create constructor
+    /////////////////////
+    // Constructor //
+    /////////////////////
     //create a constructor to start timer for phases
     //must initialize the state of voting
 
-    /** Functions */
+    /////////////////////
+    // Main Functions //
+    ////////////////////
 
-    /**
-     * @notice this function register voters to vote for phase 2: Voting
-     * @dev
-     * 1. users who enter as a candidate will be registered automatically, will be disabled at the end of phase 1
-     * 2. Optimize this by accessing struct once and store it in a local variable and use that for the checks.. see coverage first and gas viewer
-     *
-     */
-    function registerToVote() public {
-        //check for non-candidate voters
-        if (
-            checkIfVoterExist(msg.sender) &&
-            registeredVoters[msg.sender].isCandidate == false
-        ) {
-            revert Voting_VoterIsAlreadyRegistered(msg.sender);
-        }
-
-        //check for candidates
-        if (
-            checkIfVoterExist(msg.sender) &&
-            registeredVoters[msg.sender].isCandidate == true
-        ) {
-            revert Voting_VoterIsAlreadyRegistered(msg.sender);
-        }
-
-        voterIdCounter.increment();
-        numberOfVoters.increment();
-
-        uint256 _voterId = voterIdCounter.current();
-
-        address[] memory _Voterchoices;
-
-        Voter memory voter = Voter(
-            _voterId,
-            msg.sender,
-            _Voterchoices,
-            false,
-            true,
-            false
-        );
-
-        registeredVoters[msg.sender] = voter;
-
-        //emit event
-        emit VoterRegistered(_voterId, msg.sender);
-    }
+    /// --- Phase 1 Functions --- ///
 
     /**
      * @notice this functions registers candidates
      * @param _candidateName The name of the candidate
-     * @dev will be registered to vote automatically and will be disabled when register phase is over
+     * @dev Candidate will be registered to vote automatically and will be disabled when register phase is over
      */
-    function enterCandidate(
-        // address _candidateAddress,
-        string memory _candidateName // uint256 _firstVotesCount, // uint256 _secondVotesCount, // uint256 _thirdVotesCount
-    ) external {
+    function enterCandidate(string memory _candidateName) external {
         if (checkIfCandidateExist(msg.sender)) {
             revert Voting_CandidateAlreadyExists(msg.sender);
         }
 
-        //assign candidate id number
         candidateIdCounter.increment();
         numberOfCandidates.increment();
         activeCandidatesCounter.increment();
         uint256 _candidateId = candidateIdCounter.current();
-
         address[] memory _firstChoiceVoters;
 
-        //create candidate struct
-        // Candidate memory candidate = addressToCandidate[_candidateAddress];
         Candidate memory candidate = Candidate(
             _candidateId,
             _candidateName,
@@ -240,23 +239,61 @@ contract RankedChoiceContract {
         //store candidate struct in mapping
         addressToCandidate[msg.sender] = candidate;
 
-        //store user address to registeredVoter mapping
-        //emit event
-
         //push to candidate address
         candidateAddresses.push(msg.sender);
 
-        //emit CandidateRegistered event
         emit CandidateCreated(
             candidate.id,
             candidate.name,
             candidate.walletAddress
         );
+
         //if entering again after withdrawing then doesnt need to register again
         if (registeredVoters[msg.sender].voterId <= 0) {
             registerToVote();
             registeredVoters[msg.sender].isCandidate = true;
         }
+    }
+
+    /**
+     * @notice this function registers voters to vote for phase 2: Voting
+     * @dev
+     * 1. users who enter as a candidate will be registered automatically, will be disabled at the end of phase 1
+     * 2. Optimize this by accessing struct once and store it in a local variable and use that for the checks.. see coverage first and gas viewer
+     *
+     */
+    function registerToVote() public {
+        //check for non-candidate voters
+        if (
+            checkIfVoterExist(msg.sender) &&
+            registeredVoters[msg.sender].isCandidate == false
+        ) {
+            revert Voting_VoterIsAlreadyRegistered(msg.sender);
+        }
+        //check for candidates
+        if (
+            checkIfVoterExist(msg.sender) &&
+            registeredVoters[msg.sender].isCandidate == true
+        ) {
+            revert Voting_VoterIsAlreadyRegistered(msg.sender);
+        }
+
+        voterIdCounter.increment();
+        numberOfVoters.increment();
+        uint256 _voterId = voterIdCounter.current();
+        address[] memory _Voterchoices;
+
+        Voter memory voter = Voter(
+            _voterId,
+            msg.sender,
+            _Voterchoices,
+            false,
+            true,
+            false
+        );
+
+        registeredVoters[msg.sender] = voter;
+        emit VoterRegistered(_voterId, msg.sender);
     }
 
     /**
@@ -304,12 +341,12 @@ contract RankedChoiceContract {
         address firstChoice,
         address secondChoice,
         address thirdChoice
-    ) public {
-        //checks
-        if (checkIfVoterExist(msg.sender) == false) {
-            revert Voting_VoterDoesNotExist(msg.sender);
-        }
-
+    )
+        public
+        onlyExistingVoter
+        onlyExistingCandidateChoices(firstChoice, secondChoice, thirdChoice)
+        onlyUniqueChoices(firstChoice, secondChoice, thirdChoice)
+    {
         Voter storage _voter = registeredVoters[msg.sender];
 
         if (_voter.isRegistered == false) {
@@ -320,37 +357,10 @@ contract RankedChoiceContract {
             revert PhaseTwo_AlreadyVoted(msg.sender);
         }
 
-        //checks if candidates exist
-        if (checkIfCandidateExist(firstChoice) == false) {
-            revert Voting_CandidateAddressDoesNotExist(firstChoice);
-        }
-        if (checkIfCandidateExist(secondChoice) == false) {
-            revert Voting_CandidateAddressDoesNotExist(secondChoice);
-        }
-        if (checkIfCandidateExist(thirdChoice) == false) {
-            revert Voting_CandidateAddressDoesNotExist(thirdChoice);
-        }
-
-        //checks for candidates must exist - there must be an efficient way, maybe use a mapping
-        if (
-            firstChoice == secondChoice ||
-            firstChoice == thirdChoice ||
-            secondChoice == thirdChoice
-        ) {
-            revert PhaseTwo_CandidateCannotReceiveMultipleVotesFromTheSameVoter(
-                msg.sender
-            );
-        }
-
-        //need a check for picking same candidate multiple times... cannot happen
-
-        //updates
-        //look for first choice and add voter to the array of firstChoice voters - can definitely improve this...
-        //we are accessing storage multiple times...
+        //Assign vote to firstChoice
         Candidate storage _firstChoice = addressToCandidate[firstChoice];
         _firstChoice.firstChoiceVoters.push(msg.sender);
         _firstChoice.firstVotesCount = _firstChoice.firstChoiceVoters.length;
-
         addressToCandidate[firstChoice] = _firstChoice;
 
         //add voter's choices
@@ -364,7 +374,6 @@ contract RankedChoiceContract {
         registeredVoters[msg.sender] = _voter;
         numberOfVotersVoted.increment();
 
-        //emit event
         emit Voted(
             _voter.voterId,
             _voter.walletAddress,
@@ -376,35 +385,29 @@ contract RankedChoiceContract {
     }
 
     /// Phase 3: Count Votes
+    // beginPhase3()
 
     /**
      * @notice this function calculates the votes to get the winner
-     * @dev see pointer below:
-     * 1. If a candidate has >= 50% of the votes + 1 then he/she is the winner
-     * 2. ...if no winner in round 1, go to the next round and distribute the 2nc choice of the 1st choice voters of the eliminated candidate(s)
-     * 3. count again
+     * @dev can only be called after phase3 begins and only by the deployer
      */
     function countVotes() public {
         ///TODO checks
+        // onlyDeployer can initiate vote count
         //if phase2 is over - check flags
+
         uint256 totalPossibleVotes = numberOfVotersVoted.current();
         uint256 threshold = (totalPossibleVotes / 2) + 1;
 
+        //loop until winner is found or tied
         while (isWinnerPicked == false && areAllActiveCandidatesTied == false) {
             // calculate total votes for each candidates
-            // need to check for edge cases
-            // we can have a helper function for round1
-            //this can be a helper function
             countFirstChoiceVotes(threshold);
 
-            //can move this ins
-            //distribute eliminated candidates - firstChoiceVoter points
             console.log(
                 "isWinnerPicked before entering distributeVotes",
                 isWinnerPicked
             );
-
-            //TODO delete this after testing
             console.log(
                 "First choice votes array length",
                 firstChoiceVotersAddresses.length
@@ -413,6 +416,7 @@ contract RankedChoiceContract {
                 "Number of active candidates left: ",
                 activeCandidatesCounter.current()
             );
+
             if (
                 isWinnerPicked == false && areAllActiveCandidatesTied == false
             ) {
@@ -425,7 +429,6 @@ contract RankedChoiceContract {
             } else if (
                 isWinnerPicked == false && areAllActiveCandidatesTied == true
             ) {
-                //emit event
                 console.log("All candidates are tied after counting votes");
                 emit CountVotes_AllCandidatesAreTiedAfterCount(round.current());
             }
@@ -434,14 +437,8 @@ contract RankedChoiceContract {
 
     /**
      * @notice this is a helper function for countVotes() to count firstChoice votes for each candidate
-     *
      */
     function countFirstChoiceVotes(uint256 _threshold) private {
-        //TODO
-        //check if there is only 1 remaining candidate - Edge Case
-        //delete firstChoiceVotersAddresses; - commented to test clearing this arr at the end of distributeVotes()
-
-        //Increment round number
         round.increment();
         console.log("----- COUNT FIRST CHOICE VOTES -----");
         console.log("ROUND: ", round.current());
@@ -449,18 +446,11 @@ contract RankedChoiceContract {
         uint256 highestVote = 0;
         uint256 lowestVote = _threshold;
 
-        //Active candidates
-        //activeCandidatesCounter.reset();
-
         console.log("HighestVote", highestVote);
         console.log("LowestVote", lowestVote);
-
-        //array to keep track of lowest vote getters
-        //address[] memory lowestVoteGetters;
         console.log("Number of candidates", activeCandidatesCounter.current());
 
         for (uint256 i = 0; i < numberOfCandidates.current(); i++) {
-            //There variables will reset after each iteration
             address _candidateAddress = candidateAddresses[i];
 
             if (checkIfCandidateExist(_candidateAddress) == true) {
@@ -474,6 +464,7 @@ contract RankedChoiceContract {
                     " at index ",
                     i
                 );
+
                 console.log("Number of votes: ", _candidate.firstVotesCount);
 
                 //Delete 0 firstChoice getters
@@ -491,7 +482,6 @@ contract RankedChoiceContract {
                         _candidate.firstVotesCount,
                         round.current()
                     );
-
                     activeCandidatesCounter.decrement();
                 } else if (_candidate.firstVotesCount >= _threshold) {
                     highestVote = _candidate.firstVotesCount;
@@ -530,10 +520,7 @@ contract RankedChoiceContract {
             areAllActiveCandidatesTied = true;
         }
 
-        //get the lowest vote getters at the end of the round and eliminate
-        //and switch the isEliminated flag to true, when distributing votes, make sure to check the flag in order to NOT give the points to an already eliminated candidate
-        //get lowest vote candidates - at this point we know the lowest vote count, so traverse the list of candidates again
-        // save the firstChoiceVoters to array
+        //get the lowest vote getters at the end of the round and eliminate & save the firstChoiceVoters to array
         if (isWinnerPicked == false && areAllActiveCandidatesTied == false) {
             console.log("--- Start eliminating lowest vote candidates ----");
             console.log("Highest vote", highestVote);
@@ -588,7 +575,7 @@ contract RankedChoiceContract {
                     }
                     //save candidate with highestVote as winner
                     if (_candidate.firstVotesCount == highestVote) {
-                        winner = winner = _candidate.walletAddress;
+                        winner = _candidate.walletAddress;
                     }
                 }
             }
@@ -607,7 +594,6 @@ contract RankedChoiceContract {
                     round.current()
                 );
             }
-
             console.log("---Finished eliminating lowest vote candidates ---");
         }
     }
@@ -615,8 +601,7 @@ contract RankedChoiceContract {
     /**
      * @notice this function distributes the first choice votes of the eliminated (lowest) vote candidates to their next ranked candidates
      */
-    function distributeVotes() internal {
-        //FIXME theres an infinite loop somwhere..NEED to test this manually.. need to break it down to make sure the arrays hold the correct addresses etc... need to create helper functions... for individual tests for each step of the process..
+    function distributeVotes() private {
         //traverse firstChoiceVoters addresses to get address
         console.log(
             "--- Distribute votes from lowest vote candidates ---",
@@ -635,7 +620,6 @@ contract RankedChoiceContract {
             );
 
             //pop the 1st choice vote
-            //need to test that the vote went to the next choice
             if (_voter.voterChoices.length > 0) {
                 address _fromCandidate = _voter.voterChoices[
                     _voter.voterChoices.length - 1
@@ -659,7 +643,6 @@ contract RankedChoiceContract {
                                 ", from voter : ",
                                 _voter.walletAddress
                             );
-                            //Emit event 2nd choice doesnt exist so give vote to 3rd choice
                             emit CountVotes_SecondChoiceIsEliminated(
                                 _voter.walletAddress,
                                 _voter.voterChoices[index],
@@ -670,7 +653,6 @@ contract RankedChoiceContract {
                                 "All of the voter's candidate are eliminated for voter: ",
                                 _voter.walletAddress
                             );
-                            //Emit event NoMoreVotesToDistributeForVoter
                             emit CountVotes_ExhaustedVoterChoices(
                                 _voter.walletAddress,
                                 round.current()
@@ -738,7 +720,9 @@ contract RankedChoiceContract {
         console.log("--- Finished Distributing Votes ---");
     }
 
+    ////////////////////////
     /// Getter functions ///
+    ////////////////////////
     function getCandidateByAddress(
         address _candidateAddress
     ) external view returns (Candidate memory) {
