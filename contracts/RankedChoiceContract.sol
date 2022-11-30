@@ -6,11 +6,7 @@ import "hardhat/console.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// Errors ///
-error ActionIsNotAllowedAtThisStage(
-    address user,
-    uint16 currentPhase,
-    uint16 functionPhase
-);
+error ActionIsNotAllowedAtThisStage(uint16 currentPhase, uint16 functionPhase);
 error OnlyElectionAdministratorIsAllowedAccess(address user);
 error Voting_CandidateAlreadyExists(address candidateAddress);
 error Voting_CandidateAddressDoesNotExist(address candidateAddress);
@@ -206,11 +202,7 @@ contract RankedChoiceContract {
 
     modifier ifCurrentPhaseIsActive(uint16 phase) {
         if (phase != currentPhase) {
-            revert ActionIsNotAllowedAtThisStage(
-                msg.sender,
-                currentPhase,
-                phase
-            );
+            revert ActionIsNotAllowedAtThisStage(currentPhase, phase);
         }
         _;
     }

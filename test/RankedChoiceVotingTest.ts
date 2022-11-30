@@ -180,6 +180,7 @@ describe("RankedChoiceVoting", function () {
     }
 
     describe("Create candidate", function () {
+        it("...")
         it("...emits an event after creating a candidate", async function () {
             const { rankedChoiceContract, owner } = await loadFixture(
                 deployRankedChoiceVotingContract
@@ -333,6 +334,8 @@ describe("RankedChoiceVoting", function () {
             const { rankedChoiceContract, owner, user1, user2, user3 } =
                 await loadFixture(votingFixture)
 
+            await rankedChoiceContract.connect(owner).beginPhaseTwo()
+
             expect(
                 await rankedChoiceContract.vote(
                     owner.address,
@@ -342,9 +345,41 @@ describe("RankedChoiceVoting", function () {
             ).to.emit(rankedChoiceContract, "Voted")
         })
 
+        it("...it reverts if attempting to go to Phase 2 with a NON-ADMIN account", async function () {
+            const { rankedChoiceContract, owner, user1, user2, user3 } =
+                await loadFixture(votingFixture)
+
+            await expect(rankedChoiceContract.connect(user1).beginPhaseTwo())
+                .to.be.revertedWithCustomError(
+                    rankedChoiceContract,
+                    "OnlyElectionAdministratorIsAllowedAccess"
+                )
+                .withArgs(user1.address)
+        })
+
+        it("...it reverts if attempting to vote before end of Phase 1 (Sign up)", async function () {
+            const { rankedChoiceContract, owner, user1, user2, user3 } =
+                await loadFixture(votingFixture)
+            await expect(
+                rankedChoiceContract.vote(
+                    owner.address,
+                    user1.address,
+                    user2.address
+                )
+            )
+                .to.be.revertedWithCustomError(
+                    rankedChoiceContract,
+                    "ActionIsNotAllowedAtThisStage"
+                )
+                .withArgs(1, 2)
+        })
+
         it("...checks that after voting, candidate 1 has 1 point", async function () {
             const { rankedChoiceContract, owner, user1, user2, user3 } =
                 await loadFixture(votingFixture)
+
+            await rankedChoiceContract.connect(owner).beginPhaseTwo()
+
             await rankedChoiceContract.vote(
                 owner.address,
                 user1.address,
@@ -359,6 +394,9 @@ describe("RankedChoiceVoting", function () {
         it("...checks that after voting, candidate 2 has 0 points", async function () {
             const { rankedChoiceContract, owner, user1, user2, user3 } =
                 await loadFixture(votingFixture)
+
+            await rankedChoiceContract.connect(owner).beginPhaseTwo()
+
             await rankedChoiceContract.vote(
                 owner.address,
                 user1.address,
@@ -372,6 +410,8 @@ describe("RankedChoiceVoting", function () {
         it("...checks that after voting, candidate 3 has 0 point", async function () {
             const { rankedChoiceContract, owner, user1, user2, user3 } =
                 await loadFixture(votingFixture)
+
+            await rankedChoiceContract.connect(owner).beginPhaseTwo()
             await rankedChoiceContract.vote(
                 owner.address,
                 user1.address,
@@ -385,6 +425,8 @@ describe("RankedChoiceVoting", function () {
         it("...checks that after voting from 3 different voters, candidate 1 has 3 points", async function () {
             const { rankedChoiceContract, owner, user1, user2 } =
                 await loadFixture(votingFixture)
+
+            await rankedChoiceContract.connect(owner).beginPhaseTwo()
             await rankedChoiceContract.vote(
                 owner.address,
                 user1.address,
@@ -406,6 +448,8 @@ describe("RankedChoiceVoting", function () {
         it("...checks that after voting from two different voters, candidate 2 has 1 point", async function () {
             const { rankedChoiceContract, owner, user1, user2 } =
                 await loadFixture(votingFixture)
+
+            await rankedChoiceContract.connect(owner).beginPhaseTwo()
             await rankedChoiceContract.vote(
                 owner.address,
                 user1.address,
@@ -422,6 +466,8 @@ describe("RankedChoiceVoting", function () {
         it("...checks that after voting from two different voters, candidate 3 has 0 point", async function () {
             const { rankedChoiceContract, owner, user1, user2 } =
                 await loadFixture(votingFixture)
+
+            await rankedChoiceContract.connect(owner).beginPhaseTwo()
             await rankedChoiceContract.vote(
                 owner.address,
                 user1.address,
@@ -439,6 +485,8 @@ describe("RankedChoiceVoting", function () {
         it("...checks that after voting, the voter has hasVoted flag equal to true", async function () {
             const { rankedChoiceContract, owner, user1, user2 } =
                 await loadFixture(votingFixture)
+
+            await rankedChoiceContract.connect(owner).beginPhaseTwo()
             await rankedChoiceContract.vote(
                 owner.address,
                 user1.address,
@@ -454,6 +502,8 @@ describe("RankedChoiceVoting", function () {
         it("...checks that after voting, the voter has stored 3 choices in voter struct", async function () {
             const { rankedChoiceContract, owner, user1, user2 } =
                 await loadFixture(votingFixture)
+
+            await rankedChoiceContract.connect(owner).beginPhaseTwo()
             await rankedChoiceContract.vote(
                 owner.address,
                 user1.address,
@@ -469,6 +519,8 @@ describe("RankedChoiceVoting", function () {
         it("...reverts when attempting to cast vote again after voting", async function () {
             const { rankedChoiceContract, owner, user1, user2 } =
                 await loadFixture(votingFixture)
+
+            await rankedChoiceContract.connect(owner).beginPhaseTwo()
             await rankedChoiceContract.vote(
                 owner.address,
                 user1.address,
@@ -491,6 +543,8 @@ describe("RankedChoiceVoting", function () {
         it("...reverts when voting with an unregistered voter", async function () {
             const { rankedChoiceContract, owner, user1, user2, user3 } =
                 await loadFixture(votingFixture)
+
+            await rankedChoiceContract.connect(owner).beginPhaseTwo()
             await rankedChoiceContract.vote(
                 owner.address,
                 user1.address,
@@ -512,6 +566,8 @@ describe("RankedChoiceVoting", function () {
             const { rankedChoiceContract, owner, user1 } = await loadFixture(
                 votingFixture
             )
+
+            await rankedChoiceContract.connect(owner).beginPhaseTwo()
             await expect(
                 rankedChoiceContract.vote(
                     owner.address,
@@ -529,6 +585,8 @@ describe("RankedChoiceVoting", function () {
         it("...reverts if voting for a nonexistent candidate", async function () {
             const { rankedChoiceContract, owner, user1, user2, user3 } =
                 await loadFixture(votingFixture)
+
+            await rankedChoiceContract.connect(owner).beginPhaseTwo()
             await expect(
                 rankedChoiceContract.vote(
                     owner.address,
@@ -548,6 +606,8 @@ describe("RankedChoiceVoting", function () {
                 await loadFixture(votingFixture)
 
             await rankedChoiceContract.connect(user3).registerToVote()
+
+            await rankedChoiceContract.connect(owner).beginPhaseTwo()
 
             await rankedChoiceContract
                 .connect(owner)
