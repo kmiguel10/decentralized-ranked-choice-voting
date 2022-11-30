@@ -6,6 +6,12 @@ import "hardhat/console.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// Errors ///
+error ActionIsNotAllowedAtThisStage(
+    address user,
+    uint16 currentPhase,
+    uint16 functionPhase
+);
+error OnlyElectionAdministratorIsAllowedAccess(address user);
 error Voting_CandidateAlreadyExists(address candidateAddress);
 error Voting_CandidateAddressDoesNotExist(address candidateAddress);
 error Voting_VoterIsAlreadyRegistered(address voterAddress);
@@ -129,19 +135,15 @@ contract RankedChoiceContract {
     mapping(address => Voter) private registeredVoters; //TODO might be a good idea to use enumerable type from OpenZeppeling
 
     /// Election global variables ///
-    bool phaseOneSwitch;
-    bool phaseTwoSwitch;
-    bool phaseThreeSwitch;
-    bool isWinnerPicked; //TODO initialize to false in the constructor
-    bool areAllActiveCandidatesTied; //initialize to false in constructor
+    address public electionAdmin;
+    bool private isWinnerPicked; //TODO initialize to false in the constructor
+    bool private areAllActiveCandidatesTied; //initialize to false in constructor
     Counters.Counter private candidateIdCounter;
     Counters.Counter private numberOfCandidates;
     Counters.Counter private voterIdCounter;
     Counters.Counter public numberOfVoters;
     Counters.Counter public numberOfVotersVoted;
-    uint256 constant FIRST_CHOICE = 3;
-    uint256 constant SECOND_CHOICE = 2;
-    uint256 constant THIRD_CHOICE = 1;
+    uint16 private currentPhase;
 
     /// phase 3 variables
     address public winner;
@@ -195,25 +197,47 @@ contract RankedChoiceContract {
         _;
     }
 
-    //TODO create constructor
+    modifier onlyElectionAdmin() {
+        if (msg.sender != electionAdmin) {
+            revert OnlyElectionAdministratorIsAllowedAccess(msg.sender);
+        }
+        _;
+    }
+
+    modifier ifCurrentPhaseIsActive(uint16 phase) {
+        if (phase != currentPhase) {
+            revert ActionIsNotAllowedAtThisStage(
+                msg.sender,
+                currentPhase,
+                phase
+            );
+        }
+        _;
+    }
+
     /////////////////////
     // Constructor //
     /////////////////////
-    //create a constructor to start timer for phases
-    //must initialize the state of voting
+
+    constructor() {
+        electionAdmin = msg.sender;
+        isWinnerPicked = false;
+        currentPhase = 1;
+    }
 
     /////////////////////
     // Main Functions //
     ////////////////////
 
     /// --- Phase 1 Functions --- ///
-
     /**
      * @notice this functions registers candidates
      * @param _candidateName The name of the candidate
      * @dev Candidate will be registered to vote automatically and will be disabled when register phase is over
      */
-    function enterCandidate(string memory _candidateName) external {
+    function enterCandidate(
+        string memory _candidateName
+    ) external ifCurrentPhaseIsActive(1) {
         if (checkIfCandidateExist(msg.sender)) {
             revert Voting_CandidateAlreadyExists(msg.sender);
         }
@@ -262,7 +286,7 @@ contract RankedChoiceContract {
      * 2. Optimize this by accessing struct once and store it in a local variable and use that for the checks.. see coverage first and gas viewer
      *
      */
-    function registerToVote() public {
+    function registerToVote() public ifCurrentPhaseIsActive(1) {
         //check for non-candidate voters
         if (
             checkIfVoterExist(msg.sender) &&
@@ -303,7 +327,7 @@ contract RankedChoiceContract {
      *      2. check that person who registered are only the one who can withdraw
      *      3. check that cannot withdraw if entry does not exist
      */
-    function withdrawCandidate() external {
+    function withdrawCandidate() external ifCurrentPhaseIsActive(1) {
         if (addressToCandidate[msg.sender].id <= 0) {
             revert Voting_CandidateAddressDoesNotExist(msg.sender);
         }
@@ -325,10 +349,14 @@ contract RankedChoiceContract {
     /**
      * @notice this function turns on the phase 2 (voting) switch which disables phase 1 functionalities
      * @dev look for checks
+     * @dev change to private after testing...??
      */
-    function beginPhaseTwo() private {
-        phaseOneSwitch = false;
-        phaseTwoSwitch = true;
+    function beginPhaseTwo()
+        public
+        onlyElectionAdmin
+        ifCurrentPhaseIsActive(1)
+    {
+        currentPhase = 2;
     }
 
     /**
@@ -346,6 +374,7 @@ contract RankedChoiceContract {
         onlyExistingVoter
         onlyExistingCandidateChoices(firstChoice, secondChoice, thirdChoice)
         onlyUniqueChoices(firstChoice, secondChoice, thirdChoice)
+        ifCurrentPhaseIsActive(2)
     {
         Voter storage _voter = registeredVoters[msg.sender];
 
@@ -386,12 +415,19 @@ contract RankedChoiceContract {
 
     /// Phase 3: Count Votes
     // beginPhase3()
+    function beginPhaseThree()
+        public
+        onlyElectionAdmin
+        ifCurrentPhaseIsActive(2)
+    {
+        currentPhase = 3;
+    }
 
     /**
      * @notice this function calculates the votes to get the winner
      * @dev can only be called after phase3 begins and only by the deployer
      */
-    function countVotes() public {
+    function countVotes() public onlyElectionAdmin ifCurrentPhaseIsActive(3) {
         ///TODO checks
         // onlyDeployer can initiate vote count
         //if phase2 is over - check flags
@@ -438,7 +474,9 @@ contract RankedChoiceContract {
     /**
      * @notice this is a helper function for countVotes() to count firstChoice votes for each candidate
      */
-    function countFirstChoiceVotes(uint256 _threshold) private {
+    function countFirstChoiceVotes(
+        uint256 _threshold
+    ) private onlyElectionAdmin ifCurrentPhaseIsActive(3) {
         round.increment();
         console.log("----- COUNT FIRST CHOICE VOTES -----");
         console.log("ROUND: ", round.current());
@@ -601,7 +639,11 @@ contract RankedChoiceContract {
     /**
      * @notice this function distributes the first choice votes of the eliminated (lowest) vote candidates to their next ranked candidates
      */
-    function distributeVotes() private {
+    function distributeVotes()
+        private
+        onlyElectionAdmin
+        ifCurrentPhaseIsActive(3)
+    {
         //traverse firstChoiceVoters addresses to get address
         console.log(
             "--- Distribute votes from lowest vote candidates ---",
