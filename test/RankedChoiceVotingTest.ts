@@ -65,13 +65,15 @@ describe("RankedChoiceVoting", function () {
         //connect back to the main user
         await rankedChoiceContract.connect(owner)
 
+        //begin phase 2
+        await rankedChoiceContract.beginPhaseTwo()
+
         //owner votes
         await rankedChoiceContract.vote(
             owner.address,
             user1.address,
             user2.address
         )
-
         return { rankedChoiceContract, owner, user1, user2, user3 }
     }
 
@@ -95,8 +97,8 @@ describe("RankedChoiceVoting", function () {
 
         await rankedChoiceContract.connect(user5).enterCandidate("Candidate 6")
 
-        //connect back to the main user
-        await rankedChoiceContract.connect(owner)
+        //Begin phase 2
+        await rankedChoiceContract.connect(owner).beginPhaseTwo()
 
         //owner votes
         // await rankedChoiceContract.vote(
@@ -135,8 +137,8 @@ describe("RankedChoiceVoting", function () {
 
         await rankedChoiceContract.connect(user5).enterCandidate("Candidate 6")
 
-        //connect back to the main user
-        await rankedChoiceContract.connect(owner)
+        //Begin phase two
+        await rankedChoiceContract.connect(owner).beginPhaseTwo()
 
         //voter 1
         await rankedChoiceContract
@@ -167,6 +169,9 @@ describe("RankedChoiceVoting", function () {
             .connect(user5)
             .vote(user4.address, owner.address, user5.address)
 
+        //Begin phase three
+        await rankedChoiceContract.connect(owner).beginPhaseThree()
+
         return {
             rankedChoiceContract,
             owner,
@@ -180,7 +185,6 @@ describe("RankedChoiceVoting", function () {
     }
 
     describe("Create candidate", function () {
-        it("...")
         it("...emits an event after creating a candidate", async function () {
             const { rankedChoiceContract, owner } = await loadFixture(
                 deployRankedChoiceVotingContract
@@ -648,15 +652,15 @@ describe("RankedChoiceVoting", function () {
             await rankedChoiceContract
                 .connect(user1)
                 .vote(owner.address, user1.address, user2.address)
-
             await rankedChoiceContract
                 .connect(user2)
                 .vote(owner.address, user1.address, user2.address)
 
+            await rankedChoiceContract.connect(owner)
+            //begin phase 3
+            await rankedChoiceContract.beginPhaseThree()
             await rankedChoiceContract.connect(owner).countVotes()
-
             const winner = await rankedChoiceContract.connect(owner).getWinner()
-
             assert.equal(winner, owner.address)
         })
 
@@ -673,6 +677,8 @@ describe("RankedChoiceVoting", function () {
                 .vote(owner.address, user1.address, user2.address)
 
             await rankedChoiceContract.connect(owner)
+            //begin phase 3
+            await rankedChoiceContract.beginPhaseThree()
 
             expect(await rankedChoiceContract.connect(owner).countVotes())
                 .to.emit(
@@ -693,6 +699,8 @@ describe("RankedChoiceVoting", function () {
             await rankedChoiceContract
                 .connect(user2)
                 .vote(owner.address, user1.address, user2.address)
+            //begin phase 3
+            await rankedChoiceContract.connect(owner).beginPhaseThree()
 
             await expect(
                 rankedChoiceContract.getWinner()
@@ -743,6 +751,8 @@ describe("RankedChoiceVoting", function () {
             await rankedChoiceContract
                 .connect(user5)
                 .vote(user4.address, owner.address, user5.address)
+
+            await rankedChoiceContract.connect(owner).beginPhaseThree()
 
             //count votes
             await rankedChoiceContract.connect(owner).countVotes()
@@ -822,7 +832,7 @@ describe("RankedChoiceVoting", function () {
 
         //create a test where the 2nd choice doesnt exist and the 3rd choice is used
         it("...emits an event after distributing votes where the next choice candidate is eliminated so it skips to the 3rd choice candidate", async function () {
-            const [owner, user1, user2, user3, user4, user5, user6, user7] =
+            const [owner, user1, user2, user3, user4, user5, user6] =
                 await ethers.getSigners()
             const RankedChoiceContract = await ethers.getContractFactory(
                 "RankedChoiceContract"
@@ -853,8 +863,8 @@ describe("RankedChoiceVoting", function () {
             //Register to vote
             await rankedChoiceContract.connect(user6).registerToVote()
 
-            //connect back to the main user
-            await rankedChoiceContract.connect(owner)
+            //Begin phase 2
+            await rankedChoiceContract.connect(owner).beginPhaseTwo()
 
             //voter 1
             await rankedChoiceContract
@@ -885,12 +895,12 @@ describe("RankedChoiceVoting", function () {
                 .connect(user5)
                 .vote(user4.address, owner.address, user5.address)
 
-            //add another candidate
-            //  await rankedChoiceContract.connect(user6).registerToVote();
-
             await rankedChoiceContract
                 .connect(user6)
                 .vote(user5.address, user1.address, owner.address)
+
+            //Begin phase 3
+            await rankedChoiceContract.connect(owner).beginPhaseThree()
 
             expect(await rankedChoiceContract.countVotes())
                 .to.emit(
@@ -920,6 +930,8 @@ describe("RankedChoiceVoting", function () {
             const { rankedChoiceContract, owner, user1, user2, user3 } =
                 await loadFixture(votingFixture)
 
+            await rankedChoiceContract.beginPhaseTwo()
+
             await rankedChoiceContract
                 .connect(owner)
                 .vote(owner.address, user1.address, user2.address)
@@ -931,6 +943,8 @@ describe("RankedChoiceVoting", function () {
             await rankedChoiceContract
                 .connect(user2)
                 .vote(user2.address, owner.address, user1.address)
+
+            await rankedChoiceContract.beginPhaseThree()
 
             expect(await rankedChoiceContract.countVotes())
                 .to.emit(
@@ -970,8 +984,8 @@ describe("RankedChoiceVoting", function () {
                 .connect(user5)
                 .enterCandidate("Candidate 6")
 
-            //connect back to the main user
-            await rankedChoiceContract.connect(owner)
+            //Beign phase 2
+            await rankedChoiceContract.connect(owner).beginPhaseTwo()
 
             //voter 1
             await rankedChoiceContract
@@ -1001,6 +1015,9 @@ describe("RankedChoiceVoting", function () {
             await rankedChoiceContract
                 .connect(user5)
                 .vote(user4.address, owner.address, user5.address)
+
+            //Beign phase 3
+            await rankedChoiceContract.connect(owner).beginPhaseThree()
 
             expect(await rankedChoiceContract.countVotes())
                 .to.emit(
