@@ -184,7 +184,7 @@ describe("RankedChoiceVoting", function () {
         }
     }
 
-    describe("Create candidate", function () {
+    describe("Phase 1: Create candidate", function () {
         it("...emits an event after creating a candidate", async function () {
             const { rankedChoiceContract, owner } = await loadFixture(
                 deployRankedChoiceVotingContract
@@ -274,7 +274,7 @@ describe("RankedChoiceVoting", function () {
         })
     })
 
-    describe("Withdraw candidate", function () {
+    describe("Phase 1: Withdraw candidate", function () {
         it("...emits an events after withdrawing candidate", async function () {
             const { rankedChoiceContract, owner } = await loadFixture(
                 withdrawFixture
@@ -333,7 +333,7 @@ describe("RankedChoiceVoting", function () {
         })
     })
 
-    describe("Vote for candidates", function () {
+    describe("Phase 2: Vote for candidates", function () {
         it("...emits an event after voting for candidates", async function () {
             const { rankedChoiceContract, owner, user1, user2, user3 } =
                 await loadFixture(votingFixture)
@@ -637,7 +637,7 @@ describe("RankedChoiceVoting", function () {
     })
 
     //TODO checks for countVotes()
-    describe("Count Votes", function () {
+    describe("Phase 3: Count Votes", function () {
         // test that winner is picked
         //  - events are emitted
         //test for checks before counting
