@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "@chainlink/contracts/src/v0.8/AutomationCompatible.sol";
 
 /// Errors ///
 error ActionIsNotAllowedAtThisStage(uint16 currentPhase, uint16 functionPhase);
@@ -21,13 +22,14 @@ error PhaseTwo_CandidateCannotReceiveMultipleVotesFromTheSameVoter(
     address voterAddress
 );
 error PhaseThree_ThereIsNoWinnerYet();
+error PerformUpKeep_NotEnoughTimeHasPassed();
 
 /**
  * @title A Ranked Choice Voting Smart Contract
  * @author Kent Miguel
  * @dev uses chainlink automation to end and start register, voting, and count phases
  */
-contract RankedChoiceContract {
+contract RankedChoiceContract is AutomationCompatibleInterface {
     using Counters for Counters.Counter;
 
     /////////////////////
@@ -140,6 +142,7 @@ contract RankedChoiceContract {
     Counters.Counter public numberOfVoters;
     Counters.Counter public numberOfVotersVoted;
     uint16 private currentPhase;
+    uint256 private startTime;
 
     /// phase 3 variables
     address public winner;
@@ -215,6 +218,7 @@ contract RankedChoiceContract {
         electionAdmin = msg.sender;
         isWinnerPicked = false;
         currentPhase = 1;
+        startTime = block.timestamp;
     }
 
     /////////////////////
@@ -257,6 +261,13 @@ contract RankedChoiceContract {
 
         //push to candidate address
         candidateAddresses.push(msg.sender);
+
+        console.log(
+            "Entered candidate: ",
+            _candidateName,
+            " from address : ",
+            msg.sender
+        );
 
         emit CandidateCreated(
             candidate.id,
@@ -348,7 +359,9 @@ contract RankedChoiceContract {
         onlyElectionAdmin
         ifCurrentPhaseIsActive(1)
     {
+        console.log("Phase 1 Ends");
         currentPhase = 2;
+        console.log("Begin Phase 2");
     }
 
     /**
@@ -395,6 +408,8 @@ contract RankedChoiceContract {
         registeredVoters[msg.sender] = _voter;
         numberOfVotersVoted.increment();
 
+        console.log("Voter: ", _voter.walletAddress, " just voted");
+
         emit Voted(
             _voter.voterId,
             _voter.walletAddress,
@@ -412,7 +427,9 @@ contract RankedChoiceContract {
         onlyElectionAdmin
         ifCurrentPhaseIsActive(2)
     {
+        console.log("Phase 2 Ends");
         currentPhase = 3;
+        console.log("Phase 3 Begins");
     }
 
     /**
@@ -797,5 +814,44 @@ contract RankedChoiceContract {
             revert PhaseThree_ThereIsNoWinnerYet();
         }
         return winner;
+    }
+
+    function getLastVotingTimeStamp() public view returns (uint256) {
+        return startTime;
+    }
+
+    //Functions for Chainlink Automation
+    function checkUpkeep(
+        bytes memory /**checkData**/
+    )
+        public
+        override
+        returns (bool upkeepNeeded, bytes memory /**performData**/)
+    {
+        //will perform upkeep after 1 hour and no winner or tied candidates
+        bool timePassed = ((block.timestamp - startTime) > 1 hours);
+
+        upkeepNeeded = (timePassed &&
+            (isWinnerPicked == false || areAllActiveCandidatesTied == false));
+    }
+
+    //will change the phases after specific time has passed - current time interval is 1 hour for testing purposes
+    function performUpkeep(
+        bytes calldata /** performData **/
+    ) external override {
+        (bool upkeepNeeded, ) = checkUpkeep("");
+        // check if time has passed and begin phase 2
+        if (upkeepNeeded) {
+            if (currentPhase == 1) {
+                beginPhaseTwo();
+                startTime = block.timestamp;
+            } else if (currentPhase == 2) {
+                beginPhaseThree();
+                countVotes();
+                getWinner();
+            }
+        } else {
+            revert PerformUpKeep_NotEnoughTimeHasPassed();
+        }
     }
 }
