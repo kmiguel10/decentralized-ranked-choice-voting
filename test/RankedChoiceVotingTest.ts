@@ -1,5 +1,7 @@
 import { RankedChoiceContract } from "./../typechain-types/RankedChoiceContract"
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers"
+
+import { time } from "@nomicfoundation/hardhat-network-helpers"
 import { expect, assert } from "chai"
 import { ethers } from "hardhat"
 import { ContractFunctionVisibility } from "hardhat/internal/hardhat-network/stack-traces/model"
@@ -271,6 +273,23 @@ describe("RankedChoiceVoting", function () {
             const _numOfVoters = await rankedChoiceContract.numberOfVoters()
 
             assert.equal(_numOfVoters, 4)
+        })
+
+        it("...reverts if tries to vote while phase 1 is not over yet", async function () {
+            const { rankedChoiceContract, owner, user1, user2, user3 } =
+                await loadFixture(deployRankedChoiceVotingContract)
+
+            await rankedChoiceContract.enterCandidate("test 1")
+            await rankedChoiceContract.connect(user1).enterCandidate("test 2")
+            await rankedChoiceContract.connect(user2).enterCandidate("test 2")
+            await rankedChoiceContract.connect(user3).registerToVote()
+
+            await expect(
+                rankedChoiceContract.performUpkeep([])
+            ).to.be.revertedWithCustomError(
+                rankedChoiceContract,
+                "PerformUpKeep_NotEnoughTimeHasPassed"
+            )
         })
     })
 
@@ -636,15 +655,7 @@ describe("RankedChoiceVoting", function () {
         })
     })
 
-    //TODO checks for countVotes()
     describe("Phase 3: Count Votes", function () {
-        // test that winner is picked
-        //  - events are emitted
-        //test for checks before counting
-        //  - reverts
-        //test for count()
-        // - 0 1st votes candidates are eliminated
-
         it("...returns the address of the winner after counting votes", async function () {
             const { rankedChoiceContract, owner, user1, user2, user3 } =
                 await loadFixture(countingVotesFixture)
