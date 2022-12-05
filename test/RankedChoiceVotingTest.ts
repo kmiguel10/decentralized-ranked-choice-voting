@@ -1,10 +1,6 @@
-import { RankedChoiceContract } from "./../typechain-types/RankedChoiceContract"
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers"
-
-import { time } from "@nomicfoundation/hardhat-network-helpers"
 import { expect, assert } from "chai"
 import { ethers } from "hardhat"
-import { ContractFunctionVisibility } from "hardhat/internal/hardhat-network/stack-traces/model"
 
 describe("RankedChoiceVoting", function () {
     //fixture - deploy contract
