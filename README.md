@@ -1,29 +1,58 @@
 # Decentralized Ranked Choice Voting Contract
 
-## Rules
+## What is [Ranked Choice Voting](https://ballotpedia.org/Ranked-choice_voting_(RCV))?
 
 A ranked-choice voting system (RCV) is an electoral system in which voters rank candidates by preference on their ballots. If a candidate wins a majority of first-preference votes, he or she is declared the winner. If no candidate wins a majority of first-preference votes, the candidate with the fewest first-preference votes is eliminated. First-preference votes cast for the failed candidate are eliminated, lifting the next-preference choices indicated on those ballots. A new tally is conducted to determine whether any candidate has won a majority of the adjusted votes. The process is repeated until a candidate wins an outright majority
 
-Step 1.
+The Smart Contract has 3 phases:
+1. Phase One: 
+- register as a candidate
+- register as a voter
 
-Try running some of the following tasks:
+2. Phase Two: 
+- voting
+
+3. Phase Three:
+- Count votes
+- Get election results
+
+## Usage
+
+Step 1:
 
 ```shell
-npx hardhat help
-npx hardhat test
-REPORT_GAS=true npx hardhat test
-npx hardhat node
-npx hardhat run scripts/deploy.ts
+git clone git@github.com:kmiguel10/decentralized-ranked-choice-voting.git
+cd decentralized-ranked-choice-voting
+yarn
 ```
 
-legend:
-*** - rules of the contract
+Step 2:
+``` Create your own .env file and add required keys```
 
-Rules for Ranked Choice Voting
-1.The first round of counting votes determines whether a candidate receives a majority (more than 50% of the vote) of the votes.
-    a.If no one reaches majority then:
-        1. Eliminate those who receive no 1st choice votes ***
-        2. Eliminate the candidate with the fewest 1st votes
-            i. if there are ties then eliminate tied candidates***
-            ii. Distribute 2nd choice votes
-    b. repeat process until winner is determined
+Step 3:
+- To run unit tests
+```shell
+hh test
+or
+yarn hardhat test
+```
+
+- To check for coverage
+```shell
+hh coverage
+or
+yarn hardhat coverage
+```
+
+- To mock an election process
+
+*This election will go into round 2 and produce a winner. Look at the console to observe the election process.*
+
+```shell
+hh run scripts/mockElection.ts --network localhost
+or
+yarn hardhat run scripts/mockElection.ts --network localhost
+```
+
+goerli testnet address: 0x60ac57F4bB99BBA027C037E3cE4988FF555d77EE
+
