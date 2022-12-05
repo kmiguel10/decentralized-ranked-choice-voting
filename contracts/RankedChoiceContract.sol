@@ -214,6 +214,7 @@ contract RankedChoiceContract is AutomationCompatibleInterface {
     // Constructor //
     /////////////////////
 
+    /// TODO: Add a startElection function to set parameters
     constructor() {
         electionAdmin = msg.sender;
         isWinnerPicked = false;
