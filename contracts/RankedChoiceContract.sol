@@ -134,8 +134,8 @@ contract RankedChoiceContract is AutomationCompatibleInterface {
 
     /// Election global variables ///
     address public electionAdmin;
-    bool private isWinnerPicked; //TODO initialize to false in the constructor
-    bool private areAllActiveCandidatesTied; //initialize to false in constructor
+    bool private isWinnerPicked;
+    bool private areAllActiveCandidatesTied;
     Counters.Counter private candidateIdCounter;
     Counters.Counter private numberOfCandidates;
     Counters.Counter private voterIdCounter;
@@ -437,10 +437,6 @@ contract RankedChoiceContract is AutomationCompatibleInterface {
      * @dev can only be called after phase3 begins and only by the deployer
      */
     function countVotes() public onlyElectionAdmin ifCurrentPhaseIsActive(3) {
-        ///TODO checks
-        // onlyDeployer can initiate vote count
-        //if phase2 is over - check flags
-
         uint256 totalPossibleVotes = numberOfVotersVoted.current();
         uint256 threshold = (totalPossibleVotes / 2) + 1;
 
@@ -739,7 +735,6 @@ contract RankedChoiceContract is AutomationCompatibleInterface {
                         console.log("From", _fromCandidate);
                         console.log("to", _voter.voterChoices[index]);
 
-                        //TODO check if it is necessary to save candidate after updating its array if its already accessed by storage
                         addressToCandidate[
                             _voter.voterChoices[index]
                         ] = _candidate;
