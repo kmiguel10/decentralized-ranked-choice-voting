@@ -1,4 +1,5 @@
-const { ethers } = require("hardhat")
+import { getNamedAccounts, network, ethers } from "hardhat"
+import { moveBlocks } from "../utils/move-blocks"
 
 async function mockElection() {
     //Get contract
@@ -57,6 +58,11 @@ async function mockElection() {
 
     //Move time and begin phase 3
     await rankedChoiceContract.performUpkeep([])
+
+    if (network.config.chainId == 31337) {
+        // Moralis has a hard time if you move more than 1 at once!
+        await moveBlocks(1, 1000)
+    }
 }
 
 mockElection()
