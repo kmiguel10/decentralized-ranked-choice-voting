@@ -2,12 +2,13 @@
   "devDependencies": {
     "@ethersproject/abi": "^5.4.7",
     "@ethersproject/providers": "^5.4.7",
-    "@nomicfoundation/hardhat-chai-matchers": "^1.0.0",
-    "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
+    "@nomicfoundation/hardhat-chai-matchers": "^1.0.5",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.7",
     "@nomicfoundation/hardhat-toolbox": "^2.0.0",
     "@nomiclabs/hardhat-ethers": "npm:hardhat-deploy-ethers",
     "@nomiclabs/hardhat-etherscan": "^3.0.0",
     "@nomiclabs/hardhat-waffle": "^2.0.3",
+    "@nomiclabs/hardhat-web3": "^2.0.0",
     "@openzeppelin/contracts": "^4.8.0",
     "@typechain/ethers-v5": "^10.1.0",
     "@typechain/hardhat": "^6.1.2",
@@ -23,12 +24,22 @@
     "solidity-coverage": "^0.8.2",
     "ts-node": ">=8.0.0",
     "typechain": "^8.1.0",
-    "typescript": ">=4.5.0"
+    "typescript": ">=4.5.0",
+    "web3": "^1.8.1"
+  },
+  "mocha": {
+    "timeout": 10000000
   },
   "name": "decentralized-ranked-choice-voting",
   "version": "1.0.0",
   "main": "index.js",
   "repository": "https://github.com/kmiguel10/decentralized-ranked-choice-voting.git",
   "author": "Kent Miguel <kentmiguel10@gmail.com>",
-  "license": "MIT"
+  "license": "MIT",
+  "scripts": {
+    "hh": "yarn hardhat"
+  },
+  "dependencies": {
+    "@chainlink/contracts": "^0.5.1"
+  }
 }
