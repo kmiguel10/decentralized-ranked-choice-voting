@@ -15,23 +15,15 @@ import "@nomiclabs/hardhat-web3"
 
 const GOERLI_RPC_URL = process.env.GOERLI_RPC_URL || ""
 const PRIVATE_KEY = process.env.PRIVATE_KEY || ""
-const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY
+const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || ""
+const COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY || ""
 
 const config: HardhatUserConfig = {
     defaultNetwork: "hardhat",
     networks: {
         hardhat: {
             chainId: 31337,
-            // gasPrice: 300_000_000_000,
-            // gas: "auto",
-
-            // allowUnlimitedContractSize: true,
-            // throwOnTransactionFailures: true,
-            // throwOnCallFailures: true,
             allowUnlimitedContractSize: true,
-            //blockGasLimit: 330_022_488_000,
-            //gasMultiplier: 2,
-            //timeout: 900_000
         },
         localhost: {
             chainId: 31337,
@@ -57,12 +49,6 @@ const config: HardhatUserConfig = {
                 version: "0.6.6",
             },
         ],
-        settings: {
-            // optimizer: {
-            //     enabled: true,
-            //     runs: 200,
-            // },
-        },
     },
     namedAccounts: {
         deployer: {
@@ -84,7 +70,7 @@ const config: HardhatUserConfig = {
         currency: "USD",
         outputFile: "gas-report.txt",
         noColors: true,
-        // coinmarketcap: COINMARKETCAP_API_KEY,
+        coinmarketcap: COINMARKETCAP_API_KEY,
     },
     mocha: {
         timeout: 1000000000,
