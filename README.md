@@ -1,5 +1,7 @@
 # Decentralized Ranked Choice Voting Contract
 
+*NOTE: This version of the smart contract uses Chainlink Automation in switching from different phases of the election.*
+
 ## What is [Ranked Choice Voting](https://ballotpedia.org/Ranked-choice_voting_(RCV))?
 
 A ranked-choice voting system (RCV) is an electoral system in which voters rank candidates by preference on their ballots. If a candidate wins a majority of first-preference votes, he or she is declared the winner. If no candidate wins a majority of first-preference votes, the candidate with the fewest first-preference votes is eliminated. First-preference votes cast for the failed candidate are eliminated, lifting the next-preference choices indicated on those ballots. A new tally is conducted to determine whether any candidate has won a majority of the adjusted votes. The process is repeated until a candidate wins an outright majority
